@@ -83,7 +83,7 @@ def read_lara(nuclide):
 def read_selenium_meteo(t0,t1):
     meteo       = instance_of_data_collection()
     abspath     = os.path.dirname(__file__)
-    relpath     = 'data\meteo\met20190515.txt'
+    relpath     = 'data/meteo/met20190515.txt'
     data        = pd.read_csv(os.path.join(abspath,relpath),sep=';')
     meteo.t     = pd.to_datetime(data['Date_Time'],format='%Y-%m-%d %H:%M:%S').to_numpy()
     meteo_window = (meteo.t>=t0) == (meteo.t<=t1)

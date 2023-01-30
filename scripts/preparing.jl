@@ -8,7 +8,6 @@ include(srcdir("fp_prepare.jl"))
 FORCE_CREATE = false
 
 input_dir = "OPER_20190515"
-release = ReleaseParams()
 
 sim = SimParams(input_dir;
     res = 0.001,
@@ -27,11 +26,11 @@ fpoptions = FlexpartOption(sim)
 merge!(fpoptions["RELEASES"][:RELEASE][1], release_dict(sim.release))
 merge!(fpoptions["COMMAND"][:COMMAND], command_dict(sim))
 merge!(fpoptions["OUTGRID"][:OUTGRID], outgrid_dict(sim))
+fpoptions.options["SPECIES/SPECIES_050"] = specie_dict(sim)
+fpoptions["RELEASES"][:RELEASES_CTRL][:SPECNUM_REL] = 50
 
 Flexpart.save(fpoptions)
 
 
 avs = Available(fpsim)
 Flexpart.save(avs)
-
-Flexpart.run(fpsim)

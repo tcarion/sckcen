@@ -10,7 +10,7 @@ Base.@kwdef struct Selenium75 <: AbstractElement
     ρ::typeof(1.0kg/m^3) = 4.79u"g/cm^3"
 end
 
-molar_mass(elem::AbstractElement)::Float64 = ustrip(upreferred(elem.M))
+molar_mass(elem::AbstractElement)::Float64 = ustrip(uconvert(g/mol, elem.M))
 half_life(elem::AbstractElement)::Float64  = ustrip(upreferred(elem.tₕ))
 density(elem::AbstractElement)::Float64  = ustrip(upreferred(elem.ρ))
 

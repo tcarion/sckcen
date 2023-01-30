@@ -56,9 +56,9 @@ function outgrid_dict(sim::SimParams)
     return merge(outgrid, Dict(:OUTHEIGHTS => join(ustrip.(uconvert.(u"m", sim.heights)), ",")))
 end
 
-function specie_dict(sim::SimParams; refspecie = 18)
+function specie_dict(sim::SimParams; refspecie_num = 18)
     @unpack specie, specie = sim
-    refspecie = "SPECIES/SPECIES_0$refspecie"
+    refspecie = "SPECIES/SPECIES_0$refspecie_num"
     selenium = FlexpartSim() do fpsim
         fpoptions = FlexpartOption(fpsim)
         deepcopy(fpoptions[refspecie])
@@ -73,7 +73,5 @@ function specie_dict(sim::SimParams; refspecie = 18)
     )
 
     merge!(selenium_params, new_specie_params)
-    fpoptions.options["SPECIES/SPECIES_050"] = selenium
-    Flexpart.save(fpoptions)
-
+    return selenium
 end
