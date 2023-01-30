@@ -1,7 +1,17 @@
 name = "sckcen"
 authors = ["Carion"]
-[compat]
-julia = "1.7.3"
-DrWatson = "2.12.1"
+
 [deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
+Flexpart = "fb362612-c2d8-4302-a9fd-a07f2890630f"
+GRIBDatasets = "82be9cdb-ee19-4151-bdb3-b400788d9abc"
+Geodesy = "0ef565a4-170c-5f04-8de2-149903a85f3d"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
+Sckcen = "0b9d56c4-4766-4aad-aa14-d4271e797cba"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[compat]
+DrWatson = "2.12.1"
+julia = "1.7.3"

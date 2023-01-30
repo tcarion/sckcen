@@ -1,0 +1,5 @@
+#!/bin/bash
+
+#SBATCH -o ./logs/slurm-%j.out # STDOUT
+
+julia -p 1 $1 $2
