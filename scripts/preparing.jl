@@ -2,6 +2,8 @@ using DrWatson
 using Flexpart
 using Flexpart.FlexpartOptions
 using Flexpart.FlexpartInputs
+using Unitful
+using Sckcen
 
 include(srcdir("fp_prepare.jl"))
 
@@ -11,7 +13,11 @@ input_dir = "OPER_20190515"
 
 sim = SimParams(input_dir;
     res = 0.001,
-    stop =  DateTime(2019, 5, 15, 23)
+    stop =  DateTime(2019, 5, 15, 23),
+    activity = Activity(
+        element = Element(),
+        A = 1.49u"Bq"
+    )
 )
 
 fpsim = if FORCE_CREATE

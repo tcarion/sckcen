@@ -11,7 +11,7 @@ include("fp_utils.jl")
 
 function release_dict(rel_params::ReleaseParams)
     @unpack start, stop = rel_params
-    @unpack lon, lat  = rel_params.location
+    @unpack lon, lat, activity  = rel_params.location
     rel_dict = Dict(
         :Z1 => rel_params.height,
         :Z2 => rel_params.height,
@@ -57,7 +57,8 @@ function outgrid_dict(sim::SimParams)
 end
 
 function specie_dict(sim::SimParams; refspecie_num = 18)
-    @unpack specie, specie = sim
+    @unpack activity = sim
+    specie = activity.element
     refspecie = "SPECIES/SPECIES_0$refspecie_num"
     selenium = FlexpartSim() do fpsim
         fpoptions = FlexpartOption(fpsim)

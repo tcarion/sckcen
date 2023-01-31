@@ -33,7 +33,7 @@ Base.@kwdef mutable struct SimParams
     input::String
     start::DateTime = DEFAULT_SIM_START
     stop::DateTime = DEFAULT_SIM_STOP
-    specie::AbstractElement = Selenium75()
+    activity::Activity = Activity(element = Element(), A = 1.49u"Bq")
     release::ReleaseParams = ReleaseParams()
     we::Unitful.Length = 5000.0u"m"
     ns::Unitful.Length = 5000.0u"m"
