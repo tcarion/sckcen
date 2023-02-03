@@ -35,3 +35,38 @@ const ATTENUATION_COEFS_AIR = [
 ]
 const INTERP_MU = linear_interpolation(ATTENUATION_COEFS_AIR[:, 1], ATTENUATION_COEFS_AIR[:, 3])
 const INTERP_MUₑₙ = linear_interpolation(ATTENUATION_COEFS_AIR[:, 1], ATTENUATION_COEFS_AIR[:, 4])
+
+"""
+    const MARTIN_BUILDUP_FACTORS
+Buildup factors data from Martin (2013).
+
+# References
+Martin, J.E. (2013) Physics for Radiation Protection, Weinheim: Wiley. DOI:
+    https://doi.org/10.1002/9783527667062
+"""
+const MARTIN_BUILDUP_FACTORS = (
+    Eᵧ = [0.1,0.5,1,2,3,4,5,6,8,10]*u"MeV",
+    μx = [0.0,0.5,1,2,3,4,5,6,7,8,10,15,20,25,30],
+    Bs = [
+        # 0.1MeV  0.5MeV  1MeV    2MeV    3MeV    4MeV    5MeV    6MeV    8MeV    10MeV
+        1.00   1.00   1.00   1.00   1.00   1.00   1.00   1.00   1.00   1.00    #mux=0.0
+        2.35   1.6    1.47   1.38   1.34   1.31   1.29   1.27   1.23   1.2     #mux=0.5
+        4.46   2.44   2.08   1.83   1.71   1.63   1.57   1.52   1.43   1.37    #mux=1.0
+        11.4   4.84   3.6    2.81   2.46   2.25   2.09   1.97   1.8    1.68    #mux=2.0
+        22.5   8.21   5.46   3.86   3.22   2.85   2.6    2.41   2.15   1.97    #mux=3.0
+        38.4   12.6   7.6    4.96   4      3.46   3.11   2.85   2.5    2.26    #mux=4.0
+        59.9   17.9   10.0   6.13   4.79   4.07   3.61   3.28   2.84   2.54    #mux=5.0
+        87.8   24.2   12.7   7.35   5.6    4.69   4.12   3.71   3.17   2.82    #mux=6.0
+        123    31.6   15.6   8.61   6.43   5.31   4.62   4.14   3.51   3.1     #mux=7.0
+        166    40.1   18.8   9.92   7.26   5.94   5.12   4.57   3.84   3.37    #mux=8.0
+        282    60.6   25.8   12.6   8.97   7.19   6.13   5.42   4.49   3.92    #mux=10.0
+        800    134    47.0   20     13.4   10.3   8.63   7.51   6.08   5.25    #mux=15.0
+        1810   241    72.8   27.9   17.9   13.5   11.1   9.58   7.64   6.55    #mux=20.0
+        3570   385    103    36.2   22.5   16.7   13.6   11.6   9.17   7.84    #mux=25.0
+        6430   567    136    45     27.2   19.9   16.1   13.6   10.7   9.11    #mux=30.0
+    ]
+)
+
+bilinear_interpolation(data) = interpolate((data.μx, data.Eᵧ), data.Bs, Gridded(Linear()))
+
+const INTERP_MARTIN_B = bilinear_interpolation(MARTIN_BUILDUP_FACTORS)

@@ -11,11 +11,11 @@ include("fp_utils.jl")
 
 function release_dict(rel_params::ReleaseParams)
     @unpack start, stop = rel_params
-    @unpack lon, lat, activity  = rel_params.location
+    @unpack lon, lat  = rel_params.location
     rel_dict = Dict(
-        :Z1 => rel_params.height,
-        :Z2 => rel_params.height,
-        :MASS => rel_params.mass,
+        :Z1 => uconvert(u"m", rel_params.height),
+        :Z2 => uconvert(u"m", rel_params.height),
+        :MASS => uconvert(u"kg", round(typeof(1.0u"ng"), rel_params.mass)),
         :PARTS => rel_params.nparts,
         :IDATE1 => _date_format(start),
         :ITIME1 => _time_format(start),
@@ -27,6 +27,21 @@ function release_dict(rel_params::ReleaseParams)
         :LON2 => lon,
     )
     _stripdict(rel_dict)
+end
+
+function add_releases!(fpoptions::FlexpartOption, sim::SimParams)
+    default_releases = _get_default_option("RELEASES")[:RELEASE]
+    copied_release = deepcopy(default_releases[1])
+
+    option_releases = fpoptions["RELEASES"][:RELEASE]
+    while !isempty(option_releases)
+        pop!(option_releases)
+    end
+
+    for rel_param in sim.releases
+        newrel = merge!(copied_release, release_dict(rel_param))
+        push!(option_releases, deepcopy(newrel))
+    end
 end
 
 function command_dict(sim::SimParams)
@@ -51,14 +66,13 @@ function command_dict(sim::SimParams)
 end
 
 function outgrid_dict(sim::SimParams)
-    bbox = make_box(sim.release.location, sim.we, sim.ns)
+    bbox = make_box(sim.releases[1].location, sim.we, sim.ns)
     outgrid = Flexpart.area2outgrid(collect(bbox), sim.res)
     return merge(outgrid, Dict(:OUTHEIGHTS => join(ustrip.(uconvert.(u"m", sim.heights)), ",")))
 end
 
-function specie_dict(sim::SimParams; refspecie_num = 18)
-    @unpack activity = sim
-    specie = activity.element
+function specie_dict(elem_id::Symbol; refspecie_num = 18)
+    specie = Element(elem_id)
     refspecie = "SPECIES/SPECIES_0$refspecie_num"
     selenium = FlexpartSim() do fpsim
         fpoptions = FlexpartOption(fpsim)
@@ -75,4 +89,9 @@ function specie_dict(sim::SimParams; refspecie_num = 18)
 
     merge!(selenium_params, new_specie_params)
     return selenium
+end
+
+_get_default_option(option) = FlexpartSim() do fpsim
+    fpoptions = FlexpartOption(fpsim)
+    deepcopy(fpoptions[option])
 end

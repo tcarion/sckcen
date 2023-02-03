@@ -1,0 +1,9 @@
+#!/bin/bash
+
+simpath=/home/tcarion/projects/sckcen/data/sims/$1/
+
+#SBATCH --job-name=solo_flexpart_run
+#SBATCH --ntasks=1
+#SBATCH --output $simpath/slurm-%j.out # STDOUT
+#SBATCH --mem=16G
+scripts/run_solo.sh $simpath

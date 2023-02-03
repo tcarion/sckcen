@@ -18,6 +18,17 @@ _stripdict(dict) = Dict(k => _strip(v) for (k, v) in dict)
 
 Base.string(q::Unitful.Quantity) = string(ustrip(q))
 
+function build_source_terms(elem::Symbol, source_start, source_windows, source_rates)
+    acc = source_start
+    res = SourceTerm[]
+    for (window, rate) in zip(source_windows, source_rates)
+        right_interval = acc + window
+        push!(res, SourceTerm(elem, acc, right_interval, rate))
+        acc = acc + window
+    end
+    return res
+end
+
 Base.@kwdef mutable struct ReleaseParams
     location::ReleasePoint = ReleasePoint()
     start::DateTime = DEFAULT_RELEASE_START
@@ -29,12 +40,28 @@ end
 DrWatson.allaccess(::ReleaseParams) = (:start, :stop, :mass, :height)
 DrWatson.default_allowed(::ReleaseParams) = (Real, TimeType, Unitful.Quantity)
 
+function build_releases(sourceterms::Vector{<:SourceTerm}, height = 60.0u"m")
+    all_masses = get_mass.(Activity.(sourceterms))
+    total_mass = sum(all_masses)
+    weights = all_masses ./ total_mass
+    particles_by_release = Int.(floor.(weights .* Flexpart.MAX_PARTICLES))
+    map(zip(sourceterms, particles_by_release, all_masses)) do (sourceterm, nparts, mass)
+        ReleaseParams(
+            start = sourceterm.duration.first,
+            stop = sourceterm.duration.last,
+            nparts = nparts,
+            mass = mass,
+            height = height
+        )
+    end
+end
+
 Base.@kwdef mutable struct SimParams
+    name::String
     input::String
     start::DateTime = DEFAULT_SIM_START
     stop::DateTime = DEFAULT_SIM_STOP
-    activity::Activity = Activity(element = Element(), A = 1.49u"Bq")
-    release::ReleaseParams = ReleaseParams()
+    releases::Vector{<:ReleaseParams} = [ReleaseParams()]
     we::Unitful.Length = 5000.0u"m"
     ns::Unitful.Length = 5000.0u"m"
     res = 0.01
@@ -48,14 +75,14 @@ Base.@kwdef mutable struct SimParams
     )
 end
 
-function SimParams(input::String; kw...)
+function SimParams(name::String, input::String; kw...)
     inputpath = datadir("extractions", input, "output")
     isdir(inputpath) || error("input dir not existing")
     isempty(readdir(inputpath)) && error("no flexpart input files in the input directory")
-    SimParams(; input = inputpath, kw...)
+    SimParams(; name, input = inputpath, kw...)
 end
-DrWatson.allaccess(::SimParams) = (:we, :ns, :release, :res, :timestep)
-DrWatson.default_prefix(sim::SimParams) = "rel_$(savename(sim.release))"
+DrWatson.allaccess(::SimParams) = (:res, :timestep)
+DrWatson.default_prefix(sim::SimParams) = "$(sim.name)"
 DrWatson.default_allowed(::SimParams) = (Real, TimeType, Unitful.Quantity)
 simdir(sim::SimParams) = datadir("sims", savename(sim))
 simdir(simname::String) = datadir("sims", simname)

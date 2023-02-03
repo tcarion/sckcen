@@ -7,17 +7,25 @@ using Sckcen
 
 include(srcdir("fp_prepare.jl"))
 
+## SCRIPTS INPUTS
 FORCE_CREATE = false
+element_id = :Se75
+run_name = "FirstPuff_OPER"
+
+### Source term definition
+source_start = DateTime(2019,5,15,15,20)
+source_windows = Minute.(fill(10, 6))
+rates_windows = [9.1, 8.6, 4.1, 1.6, 1.0, 0.9] .* u"MBq/s"
+
+sourceterms = build_source_terms(element_id, source_start, source_windows, rates_windows)
 
 input_dir = "OPER_20190515"
 
-sim = SimParams(input_dir;
-    res = 0.001,
+sim = SimParams(run_name, input_dir;
+    res = 0.0005,
+    start = source_start,
     stop =  DateTime(2019, 5, 15, 23),
-    activity = Activity(
-        element = Element(),
-        A = 1.49u"Bq"
-    )
+    releases = build_releases(sourceterms),
 )
 
 fpsim = if FORCE_CREATE
@@ -29,10 +37,10 @@ end
     
 fpoptions = FlexpartOption(sim)
 
-merge!(fpoptions["RELEASES"][:RELEASE][1], release_dict(sim.release))
+add_releases!(fpoptions, sim)
 merge!(fpoptions["COMMAND"][:COMMAND], command_dict(sim))
 merge!(fpoptions["OUTGRID"][:OUTGRID], outgrid_dict(sim))
-fpoptions.options["SPECIES/SPECIES_050"] = specie_dict(sim)
+fpoptions.options["SPECIES/SPECIES_050"] = specie_dict(element_id)
 fpoptions["RELEASES"][:RELEASES_CTRL][:SPECNUM_REL] = 50
 
 Flexpart.save(fpoptions)
