@@ -47,11 +47,16 @@ end
 function command_dict(sim::SimParams)
     @unpack timestep, divsample, start, stop = sim
     timestep_sec = uconvert(u"s", timestep)
+    lat = sim.releases[1].location.lat
+    δx = sim.res * 111320 * cosd(lat)
+    tstep = Int(max(round(δx / 20., sigdigits=1), 1))
+
     time_params = Dict(
         :LOUTSTEP => timestep_sec,
         :LOUTAVER => timestep_sec,
-        :LOUTSAMPLE => ustrip(timestep_sec) / divsample |> Int,
-        :LSYNCTIME => ustrip(timestep_sec) / divsample |> Int,
+        :LOUTSAMPLE => tstep,
+        :LSYNCTIME => tstep,
+        :CTL => sim.ctl,
         :IBDATE => Dates.format(start, "yyyymmdd"),
         :IBTIME => Dates.format(start, "HHMMSS"),
         :IEDATE => Dates.format(stop, "yyyymmdd"),
@@ -65,9 +70,10 @@ function command_dict(sim::SimParams)
     _stripdict(cmd_dict)
 end
 
-function outgrid_dict(sim::SimParams)
+function outgrid_dict(sim::SimParams; digits = nothing)
     bbox = make_box(sim.releases[1].location, sim.we, sim.ns)
-    outgrid = Flexpart.area2outgrid(collect(bbox), sim.res)
+    area = isnothing(digits) ? collect(bbox) : round_area(bbox; digits)
+    outgrid = Flexpart.area2outgrid(area, sim.res)
     return merge(outgrid, Dict(:OUTHEIGHTS => join(ustrip.(uconvert.(u"m", sim.heights)), ",")))
 end
 

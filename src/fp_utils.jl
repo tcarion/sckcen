@@ -47,8 +47,8 @@ function build_releases(sourceterms::Vector{<:SourceTerm}, height = 60.0u"m")
     particles_by_release = Int.(floor.(weights .* Flexpart.MAX_PARTICLES))
     map(zip(sourceterms, particles_by_release, all_masses)) do (sourceterm, nparts, mass)
         ReleaseParams(
-            start = sourceterm.duration.first,
-            stop = sourceterm.duration.last,
+            start = sourceterm.duration.left,
+            stop = sourceterm.duration.right,
             nparts = nparts,
             mass = mass,
             height = height
@@ -65,13 +65,13 @@ Base.@kwdef mutable struct SimParams
     we::Unitful.Length = 5000.0u"m"
     ns::Unitful.Length = 5000.0u"m"
     res = 0.01
-    heights::Vector{<:Unitful.Length} = [100.0u"m"]
-    timestep::Unitful.Time = 30u"minute"
+    heights::AbstractVector{<:Unitful.Length} = [100.0u"m"]
+    timestep::Unitful.Time = 10u"minute"
     divsample::Int = 4
+    ctl = 5
     command::Dict = Dict(
         :CBLFLAG => 0,
-        :CTL => 10,
-        :IFINE => 10,
+        :IFINE => 4,
     )
 end
 
@@ -81,7 +81,7 @@ function SimParams(name::String, input::String; kw...)
     isempty(readdir(inputpath)) && error("no flexpart input files in the input directory")
     SimParams(; name, input = inputpath, kw...)
 end
-DrWatson.allaccess(::SimParams) = (:res, :timestep)
+DrWatson.allaccess(::SimParams) = (:res, :timestep, :we)
 DrWatson.default_prefix(sim::SimParams) = "$(sim.name)"
 DrWatson.default_allowed(::SimParams) = (Real, TimeType, Unitful.Quantity)
 simdir(sim::SimParams) = datadir("sims", savename(sim))

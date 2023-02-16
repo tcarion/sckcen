@@ -41,8 +41,8 @@ end
 make_box(rp::ReleasePoint = ReleasePoint(), we::Unitful.Length = WE_LENGTH*m, ns::Unitful.Length = NS_LENGTH*m) = 
     make_box(rp, uconvert(m, we) |> ustrip, uconvert(m, ns) |> ustrip)
 
-function round_area(area::AbstractVector)
-    return [ceil(area[1]), floor(area[2]), floor(area[3]), ceil(area[4])]
+function round_area(area::AbstractVector; digits = 0)
+    return [ceil(area[1]; digits), floor(area[2]; digits), floor(area[3]; digits), ceil(area[4]; digits)]
 end
 
-round_area(bbox::BBox) = round_area(collect(bbox))
+round_area(bbox::BBox; digits = 0) = round_area(collect(bbox); digits)

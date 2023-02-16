@@ -1,0 +1,4 @@
+const RELLAT = 51.21507
+const RELLON = 5.09597
+
+const RELHEIGHT = 60.

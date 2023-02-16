@@ -33,8 +33,6 @@ const ATTENUATION_COEFS_AIR = [
     7115   2.82E-5    0.0234     0.0158
     10000  2.46E-5    0.0205     0.014
 ]
-const INTERP_MU = linear_interpolation(ATTENUATION_COEFS_AIR[:, 1], ATTENUATION_COEFS_AIR[:, 3])
-const INTERP_MUₑₙ = linear_interpolation(ATTENUATION_COEFS_AIR[:, 1], ATTENUATION_COEFS_AIR[:, 4])
 
 """
     const MARTIN_BUILDUP_FACTORS
@@ -67,6 +65,81 @@ const MARTIN_BUILDUP_FACTORS = (
     ]
 )
 
-bilinear_interpolation(data) = interpolate((data.μx, data.Eᵧ), data.Bs, Gridded(Linear()))
+"""
+    const TRUBEY_BUILDUP_FACTORS
+Buildup factors data from Trubey et al (1991).
 
-const INTERP_MARTIN_B = bilinear_interpolation(MARTIN_BUILDUP_FACTORS)
+# References
+Trubey, D. K., C. M. Eisenhauer, A. Foderaro, D. V. Gopinath, Y. Harima, 
+    J. H. Hubbell, K. Shure and S. Su., 1991: Gamma-ray attenuation 
+    coefficients and buildup factors for engineering materials, American 
+    National Standard ANSI/ANS-6.4.3-1991, American Nuclear Society, 
+    La Grange Park.
+"""
+const TRUBEY_BUILDUP_FACTORS = (
+    Eᵧ = [0.015,0.02,0.03,0.04,0.05,0.06,0.08,0.1,0.15,0.2,0.3,0.4,0.5,0.6,0.8,1,1.5,2,3,4,5,6,8,10,15]*u"MeV",
+    μx = [0,0.5,1,2,3,4,5,6,7,8,10,15,20,25,30,35,40],
+    Bs = [
+# MeV 0.015  0.02    0.03    0.04    0.05    0.06    0.08    0.1     0.15    0.2     0.3     0.4     0.5     0.6     0.8     1       1.5     2       3       4       5       6       8       10      15
+        1.    1.     1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.      1.     # mux=0      
+        1.12  1.27   1.76    2.2     2.48    2.58    2.52    2.35    2.16    1.9     1.75    1.66    1.6     1.56    1.5     1.47    1.42    1.38    1.34    1.31    1.29    1.27    1.23    1.2     1.15  # mux=0.5
+        1.17  1.41   2.31    3.38    4.28    4.76    4.83    4.46    3.83    3.28    2.83    2.59    2.44    2.33    2.17    2.08    1.92    1.83    1.71    1.63    1.57    1.52    1.43    1.37    1.28  # mux=1
+        1.25  1.62   3.19    5.85    8.72    10.8    12      11.4    9.21    7.74    6.2     5.37    4.84    4.46    3.94    3.6     3.09    2.81    2.46    2.25    2.09    1.97    1.8     1.68    1.49  # mux=2
+        1.31  1.79   3.99    8.47    14.1    18.9    22.9    22.5    18.2    15      11.4    9.45    8.21    7.34    6.19    5.46    4.42    3.86    3.22    2.85    2.6     2.41    2.15    1.97    1.7   # mux=3
+        1.36  1.93   4.75    11.2    20.5    29.1    37.9    38.4    31.5    25.6    18.7    14.9    12.6    10.9    8.88    7.6     5.86    4.96    4       3.46    3.11    2.85    2.5     2.26    1.9   # mux=4
+        1.39  2.04   5.46    14.1    27.6    41.5    57.4    59.9    49.9    40      28.2    21.8    17.9    15.3    12      10      7.42    6.13    4.79    4.07    3.61    3.28    2.84    2.54    2.11  # mux=5
+        1.43  2.15   6.14    17      35.7    56.1    82      87.8    74.2    58.9    40.2    30.2    24.2    20.3    15.5    12.7    9.08    7.35    5.6     4.69    4.12    3.71    3.17    2.82    2.3   # mux=6
+        1.46  2.25   6.79    20.1    44.6    73.2    112     123     105     82.8    54.9    40.2    31.6    26      19.4    15.6    10.8    8.61    6.43    5.31    4.62    4.14    3.51    3.1     2.5   # mux=7
+        1.48  2.34   7.43    23.3    54.4    92.7    148     166     144     112     72.7    52      40.1    32.5    23.7    18.8    12.7    9.92    7.26    5.94    5.12    4.57    3.84    3.37    2.7   # mux=8
+        1.53  2.5    8.69    30      76.8    140     242     282     249     192     118     81.1    60.6    47.9    33.5    25.8    16.7    12.6    8.97    7.19    6.13    5.42    4.49    3.92    3.08  # mux=10
+        1.62  2.83   11.8    49      151     316     636     800     735     545     304     191     134     100     64.9    47      27.7    20      13.4    10.3    8.63    7.51    6.08    5.25    4.03  # mux=15
+        1.68  3.11   14.8    71.4    256     596     1350    1810    1700    1220    624     365     241     173     105     72.8    40.2    27.9    17.9    13.5    11.1    9.58    7.64    6.55    4.96  # mux=20
+        1.74  3.35   18      97.2    395     1010    2540    3570    3410    2360    1120    611     385     266     154     103     53.9    36.2    22.5    16.7    13.6    11.6    9.17    7.84    5.87  # mux=25
+        1.78  3.56   21.5    126     574     1600    4390    6430    6210    4150    1820    938     567     379     210     136     68.5    45      27.2    19.9    16.1    13.6    10.7    9.11    6.75  # mux=30
+        1.82  3.74   25.4    159     798     2410    7140    10600   10500   6770    2770    1350    788     512     274     173     84      54      32      23.1    18.5    15.4    12.3    10.4    7.58  # mux=35
+        1.85  3.88   29.7    195     1070    3480    11100   15700   17000   10500   4010    1870    1050    665     345     212     100     63.2    36.7    26.3    21      16.9    14.1    11.6    8.31 # mux=40
+    ]
+)
+
+
+"""
+    const CONVERSION_COEFS
+Conversion coefficients  for the ambient dose equivalent, H(10), and directional dose equivalent,
+H(0.07,0°), from photon fluence and air kerma free-in-air. First column is photon energy in MeV, 
+second column is H(10)/Ka in Sv/Gy.
+
+
+# Reference
+ICRP (1996) ‘Conversion Coefficients for use in Radiological Protection 
+    against External Radiation. ICRP Publication 74’, Annals of the ICRP, 
+    26(3–4). Available at:
+    https://www.icrp.org/publication.asp?id=ICRP%20Publication%2074
+    (Accessed: 2 February 958 2022)
+"""
+const CONVERSION_COEFS = [
+    0.010  0.008
+    0.015  0.26
+    0.020  0.61
+    0.030  1.10
+    0.040  1.47
+    0.050  1.67
+    0.060  1.74
+    0.080  1.72
+    0.100  1.65
+    0.150  1.49
+    0.200  1.40
+    0.300  1.31
+    0.400  1.26
+    0.500  1.23
+    0.600  1.21
+    0.800  1.19
+    1      1.17
+    1.5    1.15
+    2      1.14
+    3      1.13
+    4      1.12
+    5      1.11
+    6      1.11
+    8      1.11
+    10     1.1
+]

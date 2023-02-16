@@ -319,6 +319,12 @@ git-tree-sha1 = "5e1e4c53fa39afe63a7d356e30452249365fba99"
 uuid = "411431e0-e8b7-467b-b5e0-f676ba4f2910"
 version = "0.1.1"
 
+[[deps.EzXML]]
+deps = ["Printf", "XML2_jll"]
+git-tree-sha1 = "0fa3b52a04a4e210aeb1626def9c90df3ae65268"
+uuid = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
+version = "1.1.0"
+
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]
 git-tree-sha1 = "b57e3acbe22f8484b4b5ff66a7499717fe1a9cc8"
@@ -485,7 +491,7 @@ version = "0.3.0"
 deps = ["DataStructures", "Dates", "DiskArrays", "GRIB"]
 path = "/home/tcarion/.julia/dev/GRIBDatasets"
 uuid = "82be9cdb-ee19-4151-bdb3-b400788d9abc"
-version = "0.1.0"
+version = "0.1.1"
 
 [[deps.GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Pkg", "Qt5Base_jll", "Zlib_jll", "libpng_jll"]
@@ -1323,7 +1329,7 @@ uuid = "7b38b023-a4d7-4c5e-8d43-3f3097f304eb"
 version = "0.3.3"
 
 [[deps.Sckcen]]
-deps = ["CSV", "DataFrames", "Dates", "DelimitedFiles", "Downloads", "Flexpart", "Geodesy", "Interpolations", "Intervals", "Unitful", "ValSplit"]
+deps = ["CSV", "DataFrames", "Dates", "DelimitedFiles", "Downloads", "Flexpart", "Geodesy", "Interpolations", "Intervals", "Rasters", "Unitful", "ValSplit"]
 path = "src/Sckcen"
 uuid = "0b9d56c4-4766-4aad-aa14-d4271e797cba"
 version = "0.1.0"
@@ -1609,6 +1615,12 @@ version = "0.5.5"
 git-tree-sha1 = "cd1659ba0d57b71a464a29e64dbc67cfe83d54e7"
 uuid = "76eceee3-57b5-4d4a-8e66-0e911cebbf60"
 version = "1.6.1"
+
+[[deps.XLSX]]
+deps = ["Artifacts", "Dates", "EzXML", "Printf", "Tables", "ZipFile"]
+git-tree-sha1 = "ccd1adf7d0b22f762e1058a8d73677e7bd2a7274"
+uuid = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
+version = "0.8.4"
 
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "Zlib_jll"]

@@ -4,10 +4,9 @@ using DrWatson
 include(srcdir("outputs.jl"))
 
 element_id = :Se75
-run_name = "FirstPuff_OPER_res=0.0005_timestep=30"
+simname = "FirstPuff_OPER_res=0.0005_timestep=10"
 
-stack = RasterStack(get_output(run_name)[1])
-conc = Raster(get_output(run_name)[1])
+tobq_filename = convert_units_and_save(simname)
 
-plot(stack[])
-plot(log.(conc[height = 1, Ti = 1]))
+
+tobq = load_conc_in_bq(simname)
