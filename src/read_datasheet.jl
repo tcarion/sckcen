@@ -29,12 +29,13 @@ function read_dose_rate_sensors(filepath = DEFAULT_DATASHEET_PATH)
     return data
 end
 
-function filter_sensor(data, sensor_number)
-    name = _name_from_number(sensor_number)
-    subset(data, :longName => x -> occursin.(name, x))
-end
 
-get_first_from_name(data, sensor_number) = filter(:longName => ==(_name_from_number(sensor_number)), data) |> first
+filter_sensor(data, sensor_name::AbstractString) = subset(data, :longName => x -> occursin.(sensor_name, x))
+filter_sensor(data, sensor_number::Int) = filter_sensor(data, _name_from_number(sensor_number))
+
+
+get_first_from_name(data, sensor_name::AbstractString) = filter(:longName => ==(sensor_name), data) |> first
+get_first_from_name(data, sensor_number::Int) = get_first_from_name(data, _name_from_number(sensor_number))
 
 function get_sensor_location(data, sensor_number)
     sensor = filter_sensor(data, sensor_number)
@@ -50,7 +51,7 @@ function calc_background(
     time_window = (DateTime(2019,5,15,12), DateTime(2019,5,15,15))
     )
 
-    windowed = filter(row -> row.start >= time_window[1] && row.stop <= time_window[2], data)
+    windowed = isnothing(time_window) ? data : filter(row -> row.start >= time_window[1] && row.stop <= time_window[2], data)
     # select(groupby(data, :longName), :value => mean)
     # returns
 #     1440×2 DataFrame
@@ -90,3 +91,9 @@ function _name_from_number(sensor_number)
     strsn = length(strsn) == 1 ? "0$strsn" : strsn
     return "IMR/M$strsn"
 end
+
+dose_rate_savename(simname) = datadir("sims", simname, "dose_rates.jld2")
+
+MEASURES_SAVENAME = datadir("measures", "measures.jld2")
+
+read_background_stats() = load(MEASURES_SAVENAME, "background_stats")

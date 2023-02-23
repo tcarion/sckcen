@@ -1515,6 +1515,12 @@ git-tree-sha1 = "7e6b0e3e571be0b4dd4d2a9a3a83b65c04351ccc"
 uuid = "731e570b-9d59-4bfa-96dc-6df516fadf69"
 version = "0.6.3"
 
+[[deps.TimeSeries]]
+deps = ["Dates", "DelimitedFiles", "DocStringExtensions", "RecipesBase", "Reexport", "Statistics", "Tables"]
+git-tree-sha1 = "3dd965ee9ce5e1857172cffa6d8985cd8b299585"
+uuid = "9e3dc215-6440-5c97-bce1-76c03772f85e"
+version = "0.23.1"
+
 [[deps.TimeZones]]
 deps = ["Dates", "Downloads", "InlineStrings", "LazyArtifacts", "Mocking", "Printf", "RecipesBase", "Scratch", "Unicode"]
 git-tree-sha1 = "a92ec4466fc6e3dd704e2668b5e7f24add36d242"

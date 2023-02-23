@@ -89,7 +89,7 @@ function specie_dict(elem_id::Symbol; refspecie_num = 18)
     new_specie_params = Dict(
         :PSPECIES => "\"Se-75\"",
         :PDECAY => half_life(specie),
-        :PDENSITY => density(specie),
+        :PDENSITY => Sckcen.density(specie),
         :PWEIGHTMOLAR => molar_mass(specie),
     )
 

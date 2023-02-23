@@ -7,6 +7,7 @@ using Unitful
 include("fp_utils.jl")
 
 const NCF_TO_BQ_PREFIX = "conc_bq.nc"
+const DD = Rasters.DimensionalData
 
 function get_outputs(simname::String)
     fpsim = FlexpartSim(simpathnames(simname))
@@ -55,6 +56,22 @@ end
 function load_conc_in_bq(simname)
     filename = datadir("sims", simname, "output", NCF_TO_BQ_PREFIX)
     Raster(filename)
+end
+
+function prepare_output_for_doserate(simname)
+    conc_mass = Raster(string(get_outputs(simname)[1]); name = :spec001_mr)
+    replace!(conc_mass, NaN => 0.)
+    conc_mass = sum(conc_mass; dims = :pointspec)[pointspec = 1, nageclass = 1]
+    
+    conc = convert_to_bq(conc_mass)
+    conc = set(conc, :height => Z)
+    Xdim = dims(conc, X)
+    xs = round.(Float64.(Xdim); sigdigits = 7) 
+    Ydim = dims(conc, Y)
+    ys = round.(Float64.(Ydim); sigdigits = 7) 
+    conc = set(conc, X => DD.Regular(xs[2] - xs[1]), Y => DD.Regular(ys[2] - ys[1]))
+    conc = set(conc, X => xs, Y => ys)
+    return conc
 end
 
 raster_to_units(raster) = raster * uparse(replace(Rasters.metadata(raster)["units"], " " => "*", "-" => "^-"))

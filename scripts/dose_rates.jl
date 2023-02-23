@@ -2,86 +2,44 @@ using DrWatson
 using Sckcen
 using Unitful
 using Rasters
-using Plots
+using JLD2
 
-const DD = Rasters.DimensionalData
-
-include(srcdir("outputs.jl"))
 include(srcdir("read_datasheet.jl"))
-include(srcdir("projections.jl"))
 include(srcdir("outputs.jl"))
 
 element_id = :Se75
 simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
+DOSE_RATE_SAVENAME = dose_rate_savename(simname)
+
 rho = 0.001161u"g/cm^3"
 nuclide_data = read_lara_file("Se-75")
 
-sensor_numbers = [3, 4, 15]
-sensor_numbers = [3]
+sensor_numbers = [0, 1, 2, 3, 4, 8, 12, 14, 15]
+# sensor_numbers = [3, 4, 15]
+# sensor_numbers = [3]
 
-conc_mass = Raster(string(get_outputs(simname)[1]); name = :spec001_mr)
-replace!(conc_mass, NaN => 0.)
-conc_mass = sum(conc_mass; dims = :pointspec)[pointspec = 1, nageclass = 1]
-
-conc = convert_to_bq(conc_mass)
-conc = set(conc, :height => Z)
-Xdim = dims(conc, X)
-xs = round.(Float64.(Xdim); sigdigits = 7) 
-Ydim = dims(conc, Y)
-ys = round.(Float64.(Ydim); sigdigits = 7) 
-conc = set(conc, X => DD.Regular(xs[2] - xs[1]), Y => DD.Regular(ys[2] - ys[1]))
-conc = set(conc, X => xs, Y => ys)
+conc = prepare_output_for_doserate(simname)
+times = dims(conc, Ti) |> collect
 
 sensors_dose_rates = read_dose_rate_sensors()
 
-H10s = map(sensor_numbers) do sensor_number
+## Calculate dose rates
+dose_rates = map(sensor_numbers) do sensor_number
     location_receptor = get_sensor_location(sensors_dose_rates, sensor_number)
     receptor = [location_receptor.lon, location_receptor.lat, location_receptor.alt]
     
     # factors_D, factors_H10 = gamma_dose_rate_factors(conc[Ti = 1], location_receptor, nuclide_data, rho)
-    _, H10 = time_resolved_dosimetry(conc, location_receptor, nuclide_data, rho)
-    return H10
+    D, H10 = time_resolved_dosimetry(conc, location_receptor, nuclide_data, rho)
+    return (; times, D, H10)
 end
 
-# plot(ts, D, marker = :dot, xlims = (DateTime(2019,5,15,15,10), DateTime(2019,5,15,16,10)), xrotation = 20)
-# plot(M03.stop, M03.value .- get_first_from_name(mean_and_std, 3).value_mean)
-##
-plotdirpath = mkpath(plotsdir("experimental", "dose_rates", simname))
+## Save dose rates
+data_to_save = Dict(
+    _name_from_number(sensor_number) => dose_rate for (dose_rate, sensor_number) in zip(dose_rates, sensor_numbers)
+)
+save(DOSE_RATE_SAVENAME, data_to_save)
 
-plots = map(zip(sensor_numbers, H10s)) do (sensor_number, H10)
-    mean_and_std = get_first_from_name(calc_background(sensors_dose_rates), sensor_number)
-    mean_background = mean_and_std.value_mean
-    std_background = mean_and_std.value_std
-    receptor = filter_sensor(sensors_dose_rates, sensor_number)
 
-    ts = dims(conc, Ti) |> collect
-    xticks = DateTime(2019,5,15,15,20):Dates.Minute(10):DateTime(2019,5,15,16,10)
-    sensorname = receptor[1, :longName]
-    h10plot = plot(
-        ts, H10, 
-        label = "Flexpart",
-        marker = :dot,
-        xlims = (DateTime(2019,5,15,15,18), DateTime(2019,5,15,16,12)),
-        xticks = (xticks, [Dates.format(x, "HH:MM") for x in xticks]),
-        xrotation = 45,
-        grid = false,
-        markerstrokecolor=:auto
-    
-    )
-    plot!(h10plot,
-        receptor.stop, 
-        receptor.value .- mean_background,
-        label = sensorname,
-        yerror = 2*std_background,
-        marker = :dot,
-        markerstrokecolor=:auto
-    )
-    savefig(joinpath(plotdirpath, "telerad_vs_flexpart_$(split(sensorname, "/")[2]).png"))
-    h10plot
-end
-
-# layout = @layout [a  b  c]
-# sps = plot(plots..., layout = layout)
 
 ##
 

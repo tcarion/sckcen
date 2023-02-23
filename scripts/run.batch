@@ -1,5 +1,10 @@
 #!/bin/bash
 
 #SBATCH -o ./logs/slurm-%j.out # STDOUT
+#SBATCH --nodes=1
+#SBATCH --ntasks=11
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=2G
 
-julia -p 1 $1 $2
+nproc=10
+julia $1 $2

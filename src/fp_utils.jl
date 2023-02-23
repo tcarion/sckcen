@@ -98,6 +98,7 @@ function Flexpart.create(sim::SimParams; simtype = Deterministic)
 end
 
 Flexpart.FlexpartSim(sim::SimParams) = FlexpartSim(simpathnames(sim))
+Flexpart.FlexpartSim{T}(sim::SimParams) where T = FlexpartSim{T}(simpathnames(sim))
 
 FlexpartOptions.FlexpartOption(sim::SimParams) = FlexpartOption(FlexpartSim(sim))
 
