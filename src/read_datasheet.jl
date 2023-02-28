@@ -86,13 +86,22 @@ function calc_background(
 
 end
 
+function remove_background(sensor_data)
+    background = calc_background(sensor_data)
+    joined = innerjoin(sensor_data, background; on = :longName)
+    # by_name = groupby(joined, :longName)
+    # background_substrated = transform(by_name,
+    #     :value .=>( x -> x .- mean(x)) .=> :value
+    # )
+    joined.value = joined.value .- joined.value_mean
+    return sort(joined, :longName)
+end
+
 function _name_from_number(sensor_number)
     strsn = string(sensor_number)
     strsn = length(strsn) == 1 ? "0$strsn" : strsn
     return "IMR/M$strsn"
 end
-
-dose_rate_savename(simname) = datadir("sims", simname, "dose_rates.jld2")
 
 MEASURES_SAVENAME = datadir("measures", "measures.jld2")
 

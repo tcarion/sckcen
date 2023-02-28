@@ -3,22 +3,31 @@ using Sckcen
 using Unitful
 using Rasters
 using JLD2
+using Flexpart
 
 include(srcdir("read_datasheet.jl"))
+include(srcdir("process_doserates.jl"))
 include(srcdir("outputs.jl"))
 
 element_id = :Se75
-simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
+simname = "FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0"
+is_ensemble = true
 DOSE_RATE_SAVENAME = dose_rate_savename(simname)
 
 rho = 0.001161u"g/cm^3"
 nuclide_data = read_lara_file("Se-75")
 
-sensor_numbers = [0, 1, 2, 3, 4, 8, 12, 14, 15]
+sensor_numbers = [0, 1, 2, 3, 4, 7, 8, 12, 14, 15]
 # sensor_numbers = [3, 4, 15]
 # sensor_numbers = [3]
 
-conc = prepare_output_for_doserate(simname)
+if is_ensemble
+    output = get_outputs(simname)
+    conc_mass = isempty(output) ? combine_ensemble_outputs(simname) : Raster(getpath(first(output)))
+    conc = prepare_output_for_doserate(conc_mass)
+else
+    conc = prepare_output_for_doserate(simname)
+end
 times = dims(conc, Ti) |> collect
 
 sensors_dose_rates = read_dose_rate_sensors()
@@ -29,8 +38,17 @@ dose_rates = map(sensor_numbers) do sensor_number
     receptor = [location_receptor.lon, location_receptor.lat, location_receptor.alt]
     
     # factors_D, factors_H10 = gamma_dose_rate_factors(conc[Ti = 1], location_receptor, nuclide_data, rho)
-    D, H10 = time_resolved_dosimetry(conc, location_receptor, nuclide_data, rho)
-    return (; times, D, H10)
+    if is_ensemble
+        dose_for_each_member = map(dims(conc, :member)) do imember
+            D, H10 = time_resolved_dosimetry(conc[member = At(imember)], location_receptor, nuclide_data, rho)
+            return (; times, D, H10, imember)
+        end
+
+        return dose_for_each_member
+    else
+        D, H10 = time_resolved_dosimetry(conc, location_receptor, nuclide_data, rho)
+        return (; times, D, H10)
+    end
 end
 
 ## Save dose rates

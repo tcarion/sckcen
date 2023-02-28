@@ -1,6 +1,6 @@
 
-# We use euclidean distance here, which is ok for small distances. It might be better to implement it with PROJ to have more precise values,
-# but is it worth it ?
+# ? We use euclidean distance here, which is ok for small distances. It might be better to implement it with PROJ to have more precise values,
+# ? but is it worth it ?
 """
     distance(point1::T, point2::T) where T <: Tuple
 Calculate the euclidean distance between two points given as a Tuple with field `lat`, `lon` and `alt`. The ellipsoid is considered being WGS84.

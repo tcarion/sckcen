@@ -1,19 +1,22 @@
 using Flexpart
+using Flexpart: getpath
 using DrWatson
 using Rasters
 using Sckcen
 using Unitful
+using Logging
 
 include("fp_utils.jl")
 
 const NCF_TO_BQ_PREFIX = "conc_bq.nc"
 const DD = Rasters.DimensionalData
 
-function get_outputs(simname::String)
-    fpsim = FlexpartSim(simpathnames(simname))
+function get_outputs(simname::String; simtype = Deterministic)
+    fpsim = FlexpartSim{simtype}(simpathnames(simname))
     outfiles = OutputFiles(fpsim)
     return outfiles
 end
+
 
 function Rasters.RasterStack(fpoutput::Flexpart.AbstractOutputFile)
     RasterStack(string(fpoutput))
@@ -22,6 +25,34 @@ end
 function Rasters.Raster(fpoutput::Flexpart.AbstractOutputFile)
     stack = RasterStack(fpoutput)
     view(sum(stack[:spec001_mr], dims = :pointspec); nageclass=1, pointspec = 1)
+end
+
+"""
+    combine_ensemble_outputs(ensemble_outputs::Vector{<:EnsembleOutput})
+Create a new raster from combining the netcdf files given in `ensemble_outputs`. They are concatenated along a new
+dimension `member`, where the values are the member numbers from the `ensemble_outputs` objects. Each member
+is sumed over the `pointspec` dimension and sliced over the `nageclass dimension`.
+"""
+function combine_ensemble_outputs(ensemble_outputs::Vector{<:EnsembleOutput})
+    members = [out.member for out in ensemble_outputs]
+    memdim = Dim{:member}(members)
+    series_of_spec = RasterSeries(Raster.(ensemble_outputs), memdim)
+    allinone = Rasters.combine(series_of_spec)
+
+    return allinone
+end
+function combine_ensemble_outputs(simname::String; writeit = false)
+    ensemble_outputs = get_outputs(simname; simtype = Ensemble)
+    allinone = combine_ensemble_outputs(ensemble_outputs)
+
+    if writeit
+        fpsim = FlexpartSim{Ensemble}(simpathnames(simname))
+        savepath = joinpath(fpsim[:output], basename(getpath(first(ensemble_outputs))))
+        Rasters.write(savepath, allinone)
+        @info "Combined raster saved at $savepath"
+    end
+
+    return allinone
 end
 
 function Sckcen.mass2activity(raster::AbstractRaster)
@@ -58,10 +89,14 @@ function load_conc_in_bq(simname)
     Raster(filename)
 end
 
-function prepare_output_for_doserate(simname)
+function prepare_output_for_doserate(simname::AbstractString)
     conc_mass = Raster(string(get_outputs(simname)[1]); name = :spec001_mr)
-    replace!(conc_mass, NaN => 0.)
     conc_mass = sum(conc_mass; dims = :pointspec)[pointspec = 1, nageclass = 1]
+    return prepare_output_for_doserate(conc_mass)
+end
+
+function prepare_output_for_doserate(conc_mass::AbstractRaster)
+    replace!(conc_mass, NaN => 0.)
     
     conc = convert_to_bq(conc_mass)
     conc = set(conc, :height => Z)
