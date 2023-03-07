@@ -2,6 +2,11 @@ using DrWatson
 using Rasters
 using ColorTypes: N0f8, RGB
 using Geodesy
+using ArchGDAL
+using GeoInterface
+
+const AG = ArchGDAL
+const GI = GeoInterface
 
 include(srcdir("parameters.jl"))
 
@@ -27,4 +32,23 @@ end
 function resample2map(raster, mmap; method = :max) 
     # resol = round(step(dims(mmap, :X)), sigdigits = 1)
     Rasters.resample(raster; to = mmap, method)
+end
+
+function get_center(mmap)
+    x1, xlast = extrema(dims(mmap, X))
+    y1, ylast = extrema(dims(mmap, Y))
+
+    x1 + (xlast - x1) / 2, y1 + (ylast - y1) / 2
+end
+
+"""
+    lla_to_lambert(lla_points; shift = [0, 0])
+Takes a tuple like object with `lat` and `lon` fields and project the coordinates with the
+Lambert projection. Return a tuple with `X` and `Y` fields representing the coordinates in Lambert.
+Optionnaly shift the coordinates according to `shift`
+"""
+function lla_to_lambert(lla_points; shift = [0, 0])
+    apoints = AG.createpoint.(zip(lla_points.lat, lla_points.lon))
+    lpoints = AG.reproject(apoints, source_proj, target_proj)
+    (; zip(GI.coordnames(lpoints[1]), (GI.getcoord.(lpoints, 1) .- shift[1], GI.getcoord.(lpoints, 2) .- shift[2]))...)
 end

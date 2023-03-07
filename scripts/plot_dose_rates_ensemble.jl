@@ -10,10 +10,8 @@ dose_rate_data_path = dose_rate_savename(simname)
 
 sensors_dose_rates = read_dose_rate_sensors()
 dose_rates_results = load(dose_rate_data_path)
-dose_rates_stats = Dict(
-    sensor_name => mean_and_std(ensemble_dose_rates_to_df(result)) 
-        for (sensor_name, result) in pairs(dose_rates_results)
-)
+dose_rates_df = ensemble_dose_rates_to_df(dose_rates_results)
+dose_rates_stats = mean_and_std(dose_rates_df)
 sensors_background = read_background_stats()
 
 plotdirpath = mkpath(plotsdir("experimental", "dose_rates", simname))

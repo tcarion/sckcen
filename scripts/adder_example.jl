@@ -7,6 +7,9 @@ using DrWatson
 
 using Dates
 using Rasters
+using DataFrames
+using Unitful
+using JLD2
 # using Pkg
 
 # ENV["PYTHON"]= "/home/tcarion/miniconda3/bin/python"
@@ -37,7 +40,7 @@ source = instance_of_data_collection()
 source.Hs = 60 # height of the BR2 stack [m]
 source.Ts = 15 # temperature of exhausted gas [deg. Celsius]
 source.Vs = 150000/3600 # gas outflow rate [m3/s]
-source.Q = np.array([8.3,8.3,8.3,0.,0.,0.])*1e6 # source term [Bq/s]
+source.Q = np.array([9.1,8.6,4.1,1.6,1.,0.9])*1e6 # source term [Bq/s]
 nuclide_data = read_lara('Se-75')
 
 # We retrieve the meteorological data
@@ -90,7 +93,7 @@ ts = map(t) do ti
 end
 conc = DimArray(gpm_conc, (X = xs, Y = ys, Z = zs, Ti =ts))
 
-Rasters.write(joinpath(datadir("adde"), "adde_example.nc"), conc)
+Rasters.write(joinpath(datadir("adder"), "adder_example.nc"), conc)
 
 py"""
 # Calculate the dose rate in time for each detector
@@ -101,3 +104,15 @@ for i in range(len(xq)):
     H10[i,:]= h10
     D[i,:] = d
 """
+
+sensor_names = ["IMR/M03", "IMR/M15", "IMR/M04"]
+H10 = py"H10"
+D = py"D"
+H10T = py"H10T"
+
+dfs = map(enumerate(sensor_names)) do (i, sensor_name)
+    DataFrame(longName = fill(sensor_name, length(ts)) ,times = ts, H10 = H10[i, :] * u"nSv/hr", D = D[1, :] * u"nSv/hr", sensor = H10T[i, :] * u"nSv/hr")
+end
+adder_dose_rates = vcat(dfs...)
+
+jldsave(joinpath(datadir("adder"), "adder_dose_rates.jld2"); adder_dose_rates)
