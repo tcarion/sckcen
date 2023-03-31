@@ -6,6 +6,14 @@ include(srcdir("process_doserates.jl"))
 include(srcdir("read_datasheet.jl"))
 
 simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
+simname = "OPER_PG"
+
+label = "Flexpart"
+label = "Gaussian-PG"
+
+figname = "telerad_vs_flexpart"
+figname = "telerad_vs_gaussian"
+
 dose_rate_data_path = dose_rate_savename(simname)
 
 sensors_dose_rates = read_dose_rate_sensors()
@@ -26,7 +34,7 @@ plots = map(collect(pairs(dose_rates_results))) do (sensor_name, results)
     xticks = DateTime(2019,5,15,15,20):Dates.Minute(10):DateTime(2019,5,15,16,10)
     h10plot = plot(
         timeserie, H10, 
-        label = "Flexpart",
+        label = label,
         marker = :dot,
         xlims = (DateTime(2019,5,15,15,18), DateTime(2019,5,15,16,12)),
         ylims = (-2, 6),
@@ -44,7 +52,7 @@ plots = map(collect(pairs(dose_rates_results))) do (sensor_name, results)
         marker = :dot,
         markerstrokecolor=:auto
     )
-    savefig(joinpath(plotdirpath, "telerad_vs_flexpart_$(split(sensor_name, "/")[2]).png"))
+    savefig(joinpath(plotdirpath, "$(figname)_$(split(sensor_name, "/")[2]).png"))
     h10plot
 end
 

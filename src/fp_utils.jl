@@ -1,5 +1,6 @@
 using DrWatson
 using Flexpart
+using Flexpart: getpath
 using Flexpart.FlexpartOptions
 using Dates
 using Unitful
@@ -103,3 +104,16 @@ Flexpart.FlexpartSim{T}(sim::SimParams) where T = FlexpartSim{T}(simpathnames(si
 FlexpartOptions.FlexpartOption(sim::SimParams) = FlexpartOption(FlexpartSim(sim))
 
 iscreated(sim::SimParams) = isdir(simdir(sim))
+
+function bound_input_files(inputdir, date)
+    inputs = inputs_from_dir(inputdir)
+    i = findfirst(x -> date < x.time, inputs)
+    getpath(inputs[i - 1]), getpath(inputs[i])
+end
+
+function nearest_input(date, inputs)
+    diff = map(inputs) do input
+        abs(input.time - date)
+    end
+    inputs[argmin(diff)]    
+end

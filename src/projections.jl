@@ -10,7 +10,7 @@ const GI = GeoInterface
 
 include(srcdir("parameters.jl"))
 
-const ORIGIN = LLA(RELLAT, RELLON, RELHEIGHT)
+const ORIGIN = LLA(RELLAT, RELLON, 0.)
 const trans_enu = ENUfromLLA(ORIGIN, wgs84)
 
 # source_proj = ProjString("+proj=longlat +datum=WGS84 +no_defs")
@@ -52,3 +52,5 @@ function lla_to_lambert(lla_points; shift = [0, 0])
     lpoints = AG.reproject(apoints, source_proj, target_proj)
     (; zip(GI.coordnames(lpoints[1]), (GI.getcoord.(lpoints, 1) .- shift[1], GI.getcoord.(lpoints, 2) .- shift[2]))...)
 end
+
+lla_to_enu(object) = trans_enu(LLA(; lat = object.lat, lon = object.lon))

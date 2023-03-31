@@ -65,9 +65,17 @@ sig2H10T = np.array([ 1.0542,	0.9457,	    0.8013])
 2. Actual computation
 """
 
+# t_0 = timeit.default_timer()
+# # call function
+# c, TIC = multi_plume(grid, meteo, source, Umin, switch_plume_type, switch_plume_rise)
+# # record end time
+# t_1 = timeit.default_timer()
+
+# elapsed_time = round((t_1 - t_0) * 10 ** 6, 3)
+# print(f"Elapsed time: {elapsed_time} µs")
+
 # Calculate concentration fields in time via a Gaussian plume model
 c, TIC = multi_plume(grid, meteo, source, Umin, switch_plume_type, switch_plume_rise)
-
 # Calculate the dose rate in time for each detector
 H10 = np.zeros([len(xq),len(source.Q)])
 for i in range(len(xq)):
