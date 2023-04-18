@@ -34,7 +34,7 @@ println("Remove previous temporary directory for pathnames")
 rm.(readdir(ens_tmp_dir, join = true); recursive = true)
 
 println("Creating temporary directory")
-realizations_setup = Flexpart.setup_pathnames(fpsim; parent = ens_tmp_dir)
+realizations_setup = Flexpart.setup_pathnames(fpsim; parentdir = ens_tmp_dir)
 
 pmap(realizations_setup) do (imember, rfpsim)
     id, pid, host = myid(), getpid(), gethostname()

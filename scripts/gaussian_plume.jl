@@ -27,15 +27,16 @@ winds = process_wind.(meteo_ecmwf)
 grid = CenteredGrid()
 grid_array = collect(grid)
 
-@time concentration, TIC = gaussian_puffs(
+@btime concentration, TIC = gaussian_puffs(
     grid,
-    times,
+    relstart,
+    Minute.(RELSTEPS_MINUTE),
     [w[1] for w in winds],
     [w[2] for w in winds],
     RELEASE_RATE,
     RELHEIGHT
 )
-
+#   777.593 ms (16066330 allocations: 614.54 MiB)
 # concentration, TIC = gaussian_puffs(
 #     grid,
 #     times,

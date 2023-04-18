@@ -1,4 +1,5 @@
 using DrWatson
+@quickactivate
 using Sckcen
 using Unitful
 using Rasters
@@ -11,6 +12,7 @@ include(srcdir("outputs.jl"))
 
 element_id = :Se75
 simname = "FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0"
+simname = "FirstPuff_OPER_PF_20230329_res=0.0005"
 is_ensemble = true
 DOSE_RATE_SAVENAME = dose_rate_savename(simname)
 
@@ -33,7 +35,7 @@ times = dims(conc, Ti) |> collect
 sensors_dose_rates = read_dose_rate_sensors()
 
 ## Calculate dose rates
-dose_rates = map(sensor_numbers) do sensor_number
+@time dose_rates = map(sensor_numbers) do sensor_number
     location_receptor = get_sensor_location(sensors_dose_rates, sensor_number)
     receptor = [location_receptor.lon, location_receptor.lat, location_receptor.alt]
     

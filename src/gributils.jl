@@ -16,8 +16,8 @@ end
 function InputArrays(filepath::String; tosave = ("u", "v", "t"))
     ds = GRIBDataset(filepath)
 
-    lons = X(ds["longitude"])
-    lats = Y(ds["latitude"])
+    lons = X(ds["lon"][:])
+    lats = Y(ds["lat"][:])
     heights = Z(level_heights(filepath))
     dims = (lons, lats, heights)
 
@@ -29,7 +29,7 @@ function InputArrays(filepath::String; tosave = ("u", "v", "t"))
     InputArrays(ds, lons, lats, heights, saved)
 end
 
-_todimarray(ds, var, dims) = DimArray(ds[var][:,:,1,end:-1:1], dims)
+_todimarray(ds, var, dims) = DimArray(ds[var][:,:,end:-1:1,1], dims)
 Base.getindex(o::InputArrays, var::Symbol) = getindex(o.saved, var)
 Base.getindex(o::InputArrays, var::String) = getindex(o.ds, var)
 
@@ -58,7 +58,7 @@ function nearest_input(date, inputs)
     inputs[argmin(diff)]    
 end
 
-valid_time(input::InputArrays) = GRIBDatasets.DEFAULT_EPOCH .+ Second.(collect(input.ds["valid_time"])) |> first
+valid_time(input::InputArrays) = first(input.ds["valid_time"][:])
 time_bounds(bound::BoundingInputs) = (valid_time(bound.t1), valid_time(bound.t2))
 
 function linear_interp(bound::BoundingInputs, var::Symbol, time; coords = (RELLON, RELLAT, RELHEIGHT))

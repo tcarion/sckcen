@@ -1,6 +1,5 @@
 using DrWatson
 using Flexpart
-using Flexpart.FlexpartOptions
 using Flexpart.FlexpartInputs
 using Unitful
 using Sckcen
@@ -11,6 +10,7 @@ include(srcdir("fp_prepare.jl"))
 ## SCRIPTS INPUTS
 FORCE_CREATE = false
 element_id = :Se75
+# run_name = "FirstPuff_OPER"
 run_name = "FirstPuff_OPER"
 
 ### Source term definition

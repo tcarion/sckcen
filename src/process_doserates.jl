@@ -27,6 +27,17 @@ end
 
 ensemble_dose_rates_to_df(simname::AbstractString) = ensemble_dose_rates_to_df(load(dose_rate_savename(simname)))
 
+function to_df_and_save(simname::AbstractString)
+    fname = dose_rate_savename(simname)
+    jldopen(fname, "a+") do f
+        if !haskey(f, "df")
+            df = ensemble_dose_rates_to_df(simname)
+            f["df"] = df
+            @info "Dose rates converted to DataFrame in file $fname"
+        end
+        return f["df"]
+    end
+end
 """
     mean_and_std(dose_rate_df::DataFrame)
 Compute the mean and standard deviation of the members for each time steps.

@@ -1,7 +1,6 @@
 using DrWatson
 using Flexpart
 using Flexpart: getpath
-using Flexpart.FlexpartOptions
 using Dates
 using Unitful
 using Sckcen
@@ -101,7 +100,7 @@ end
 Flexpart.FlexpartSim(sim::SimParams) = FlexpartSim(simpathnames(sim))
 Flexpart.FlexpartSim{T}(sim::SimParams) where T = FlexpartSim{T}(simpathnames(sim))
 
-FlexpartOptions.FlexpartOption(sim::SimParams) = FlexpartOption(FlexpartSim(sim))
+Flexpart.FlexpartOption(sim::SimParams) = FlexpartOption(FlexpartSim(sim))
 
 iscreated(sim::SimParams) = isdir(simdir(sim))
 

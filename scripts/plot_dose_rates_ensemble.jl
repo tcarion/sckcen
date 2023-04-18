@@ -1,11 +1,16 @@
 using DrWatson
 using Plots
 using JLD2
+using DataFramesMeta
 
 include(srcdir("process_doserates.jl"))
 include(srcdir("read_datasheet.jl"))
 
+SHIFT_DATE = true
+PLOT_MEMBERS = true
+
 simname = "FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0"
+simname = "FirstPuff_OPER_PF_20230329_res=0.0005"
 dose_rate_data_path = dose_rate_savename(simname)
 
 sensors_dose_rates = read_dose_rate_sensors()
@@ -21,16 +26,26 @@ plots = map(collect(pairs(dose_rates_results))) do (sensor_name, results)
     mean_background = stats.value_mean
     std_background = stats.value_std
     receptor = filter_sensor(sensors_dose_rates, sensor_name)
-    dose_rate_stat = dose_rates_stats[sensor_name]
+    dose_rate_stat = @rsubset dose_rates_stats :receptorName == sensor_name
     timeserie_control, D_control, H10_control = results[1]
-    xticks = DateTime(2019,5,15,15,20):Dates.Minute(10):DateTime(2019,5,15,16,10)
-    h10plot = plot(
+
+    basedate = Date(timeserie_control[1])
+    basetime_start = Time(15, 20)
+    basetime_end = Time(16, 10)
+
+    receptor_times = SHIFT_DATE ? DateTime.(basedate, Time.(receptor.stop)) : receptor.stop
+    
+    dt_start = DateTime(basedate, basetime_start)
+    dt_stop = DateTime(basedate, basetime_end)
+    xticks = dt_start:Dates.Minute(10):dt_stop
+
+    h10plot = Plots.plot(
         timeserie_control, H10_control,
         label = "Flexpart - control",
         # marker = :dot,
         # color = :red,
-        xlims = (DateTime(2019,5,15,15,18), DateTime(2019,5,15,16,12)),
-        ylims = (-2, 6),
+        xlims = (dt_start - Minute(2), dt_stop + Minute(2)),
+        # ylims = (-2, 6),
         xticks = (xticks, [Dates.format(x, "HH:MM") for x in xticks]),
         xrotation = 45,
         grid = false,
@@ -40,23 +55,31 @@ plots = map(collect(pairs(dose_rates_results))) do (sensor_name, results)
         dose_rate_stat.times, dose_rate_stat.H10_mean,
         yerror = 2*dose_rate_stat.H10_std,
         label = "Flexpart - mean",
-        # marker = :dot,
-        # color = :blue,
-        xlims = (DateTime(2019,5,15,15,18), DateTime(2019,5,15,16,12)),
-        ylims = (-2, 6),
-        xticks = (xticks, [Dates.format(x, "HH:MM") for x in xticks]),
-        xrotation = 45,
-        grid = false,
-        markerstrokecolor=:auto
     )
-    plot!(h10plot,
-        receptor.stop, 
-        receptor.value .- mean_background,
-        label = sensor_name,
-        yerror = 2*std_background,
-        # marker = :dot,
-        markerstrokecolor=:auto
-    )
+
+    if PLOT_MEMBERS
+        imembers = unique(dose_rates_df[:, :member])
+        for i in imembers
+            tp = @rsubset dose_rates_df :member == i
+            tp = @rsubset tp :receptorName == sensor_name
+            Plots.plot!(
+                tp.times, tp.H10,
+                # marker = :dot,
+                # color = :red,
+                label = false,
+
+                linewidth = 1,
+            )
+        end
+    end
+    # plot!(h10plot,
+    #     receptor_times, 
+    #     receptor.value .- mean_background,
+    #     label = sensor_name,
+    #     yerror = 2*std_background,
+    #     # marker = :dot,
+    #     markerstrokecolor=:auto
+    # )
     savefig(joinpath(plotdirpath, "telerad_vs_flexpart_$(split(sensor_name, "/")[2]).png"))
     h10plot
 end

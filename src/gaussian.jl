@@ -1,6 +1,8 @@
 using GRIBDatasets
 using DimensionalData
 using GaussianDispersion
+using UnPack
+using Dates
 
 const GD = GaussianDispersion
 
@@ -31,6 +33,16 @@ get_lengths(grid::CenteredGrid) = (grid.Lx, grid.Ly, grid.Lz)
 Base.size(grid::CenteredGrid) = (grid.Nx, grid.Ny, grid.Nz)
 Base.length(grid::CenteredGrid) = grid.Nx * grid.Ny * grid.Nz
 
+mutable struct GaussianPuff
+    grid::CenteredGrid
+    start::DateTime
+    steps::Vector{<:TimePeriod}
+    speeds::Vector{<:Float64}
+    azimuths::Vector{<:Float64}
+    rates::Vector{<:Float64}
+    h::Float64
+end
+
 function get_ranges(grid::CenteredGrid)
     Nx, Ny, Nz = size(grid)
     Xb, Yb, Zb = get_lengths(grid)
@@ -45,18 +57,14 @@ end
 Base.collect(grid::CenteredGrid) = collect(Iterators.product(get_ranges(grid)...))
 Base.iterate(grid::CenteredGrid, args...) = iterate(Iterators.product(get_ranges(grid)...), args...)
 
-function gaussian_puffs(grid::CenteredGrid, times, speeds, azimuths, Qs, h)
-    grid_array = collect(grid)
-
-    timely_conc = map(zip(speeds, azimuths, Qs)) do (wind_speed, wind_azimuth, Q)
+function run_puff(puff::GaussianPuff)
+    grid_array = collect(puff.grid)
+    @unpack speeds, azimuths, rates, h = puff
+    timely_conc = map(zip(speeds, azimuths, rates)) do (wind_speed, wind_azimuth, Q)
         pg_class = pasquill_gifford(GD.Strong(), wind_speed) |> collect |> first
         θ = 360. .+ 90. .- wind_azimuth
 
-        # ! I don't know why this minus sign is needed to get the correct result... If not, the plume rotate clockwise instead of counter-clockwise with theta.
-        rotation = rotmat(-θ)
-        gridrot = map(grid_array) do point
-            rotation * collect(point)
-        end
+        gridrot = rotate_grid(grid_array, θ)
 
         meteo = MeteoParams(wind = wind_speed, stability = pg_class)
 
@@ -69,8 +77,22 @@ function gaussian_puffs(grid::CenteredGrid, times, speeds, azimuths, Qs, h)
 
         [plume(point...) for point in gridrot]
     end
+    return timely_conc
+end
 
-    TIC = reduce((x,y) -> x .+ y * 10 * 60, timely_conc; init = zero(timely_conc[1]))
+function gaussian_puffs(grid::CenteredGrid, relstart, steps, speeds, azimuths, Qs, h)
+    puff = GaussianPuff(
+        grid,
+        relstart,
+        steps,
+        speeds,
+        azimuths,
+        Qs,
+        h
+    )
+
+    timely_conc = run_puff(puff)
+    TIC = reduce((x,y) -> x .+ y * Second(puff.steps[1]).value, timely_conc; init = zero(timely_conc[1]))
 
     ## Conversion to Dimensional Arrays
     Xs, Ys, Zs = get_ranges(grid)
@@ -87,4 +109,35 @@ function gaussian_puffs(grid::CenteredGrid, times, speeds, azimuths, Qs, h)
     )
 
     conc_da, TIC_da
+end
+
+function to_dimarray(timely_conc, grid, times)
+    TIC = reduce((x,y) -> x .+ y * Second(puff.steps[1]).value, timely_conc; init = zero(timely_conc[1]))
+
+    ## Conversion to Dimensional Arrays
+    Xs, Ys, Zs = get_ranges(grid)
+    spatial_dims = (X(Xs), Y(Ys), Z(Zs))
+
+    conc_da = DimArray(
+        cat(timely_conc..., dims = 4),
+        (spatial_dims..., Ti(times));
+        name = :conc
+    )
+
+    TIC_da = DimArray(
+        TIC,
+        spatial_dims;
+        name = :TIC
+    )
+
+    DimStack(conc_da, TIC_da)
+end
+
+function rotate_grid(grid_array, θ)
+    # ! I don't know why this minus sign is needed to get the correct result... If not, the plume rotate clockwise instead of counter-clockwise with theta.
+    rotation = rotmat(-θ)
+    gridrot = map(grid_array) do point
+        rotation * collect(point)
+    end
+    return gridrot
 end
