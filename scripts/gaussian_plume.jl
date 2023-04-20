@@ -25,9 +25,8 @@ winds = process_wind.(meteo_ecmwf)
 
 ##
 grid = CenteredGrid()
-grid_array = collect(grid)
 
-@btime concentration, TIC = gaussian_puffs(
+puff = GaussianPuff(
     grid,
     relstart,
     Minute.(RELSTEPS_MINUTE),
@@ -36,6 +35,8 @@ grid_array = collect(grid)
     RELEASE_RATE,
     RELHEIGHT
 )
+
+@time conc_da = gaussian_puffs(puff, times)
 #   777.593 ms (16066330 allocations: 614.54 MiB)
 # concentration, TIC = gaussian_puffs(
 #     grid,
@@ -46,22 +47,11 @@ grid_array = collect(grid)
 #     RELHEIGHT
 # )
 
-jldsave(concentrationfile(simname); concentration, TIC)
+save(concentrationfile(simname), Dict(GAUSSIAN_SAVENAME => conc_da))
 
-Xs = dims(concentration, X) |> collect
-Ys = dims(concentration, Y) |> collect
+# Xs = dims(concentration, X) |> collect
+# Ys = dims(concentration, Y) |> collect
 
-contourf(Xs, Ys, permutedims(concentration[:,:,1, 1]))
-contourf(Xs, Ys, permutedims(TIC[:,:,1]))
+# contourf(Xs, Ys, permutedims(concentration[:,:,1, 1]))
+# contourf(Xs, Ys, permutedims(TIC[:,:,1]))
 ##
-
-# contour(u_array[:,:,1])
-# heatmap(v_array[:,:,1])
-# stack = Raster(nearest_input_path)
-
-# ! Why the second valid_time is the start of the 
-valid_times = GRIBDatasets.DEFAULT_EPOCH .+ Second.(collect(ds["valid_time"]))
-# 2-element Vector{DateTime}:
-#  2019-05-15T15:00:00
-#  2019-05-15T00:00:00
-valid_times = GRIBDatasets.DEFAULT_EPOCH .+ Second.(collect(GRIBDataset(getpath(inputs[3]))["valid_time"]))

@@ -1,3 +1,5 @@
+using DrWatson
+@quickactivate
 using AlgebraOfGraphics, CairoMakie
 import AlgebraOfGraphics: dims as aogdims
 import AlgebraOfGraphics: data as aogdata
@@ -11,6 +13,7 @@ const AOG = AlgebraOfGraphics
 include(srcdir("process_doserates.jl"))
 
 simname = "FirstPuff_OPER_PF_20230329_res=0.0005"
+simname = "OPER_PG"
 sensor_name = "IMR/M02"
 
 DOSE_RATE_SAVENAME = dose_rate_savename(simname)

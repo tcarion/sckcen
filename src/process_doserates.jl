@@ -3,11 +3,16 @@ using DataFrames
 using StatsBase
 using StatsBase: ordinalrank
 using DataFramesMeta
+using Unitful
+using DimensionalData
+using DimensionalData: dims as ddims
 
 include(srcdir("read_datasheet.jl"))
 
 dose_rate_savename(simname) = datadir("sims", simname, "dose_rates.jld2")
 dose_rate_process_savename(simname) = datadir("sims", simname, "dose_rates_process.jld2")
+
+const DOSE_RATES_SAVENAME = "dose_rates"
 
 function ensemble_dose_rates_to_df(dose_rates_results)
     each_sensor = map(collect(pairs(dose_rates_results))) do (sensor_name, results)
@@ -24,6 +29,9 @@ function ensemble_dose_rates_to_df(dose_rates_results)
     end
     vcat(each_sensor...)
 end
+
+dose_rates_to_df(dose_rates_da) = rename!(DataFrame(dose_rates_da), [:Ti, :sensor] .=> [:time, :receptorName])
+dose_rates_to_df(simname::AbstractString) = dose_rates_to_df(load(dose_rate_savename(simname))[DOSE_RATES_SAVENAME])
 
 ensemble_dose_rates_to_df(simname::AbstractString) = ensemble_dose_rates_to_df(load(dose_rate_savename(simname)))
 
@@ -45,6 +53,28 @@ Compute the mean and standard deviation of the members for each time steps.
 mean_and_std(dose_rate_df::DataFrame) = combine(groupby(dose_rate_df, [:receptorName, :times]), :H10 => mean, :D => mean, :D => std, :H10 => std)
 
 mean_and_std(simname::AbstractString) = mean_and_std(ensemble_dose_rates_to_df(simname))
+
+function gaussian_dose_rates(concentration, sensor_numbers, sensors_dose_rates, nuclide_data = read_lara_file("Se-75"), rho = 0.001161u"g/cm^3")
+    times = ddims(concentration, Ti) |> collect
+
+    dose_rates = map(sensor_numbers) do sensor_number
+        location_receptor = get_sensor_location(sensors_dose_rates, sensor_number)
+
+        receptor = trans_enu(LLA(; location_receptor...))
+    
+        D, H10 = time_resolved_dosimetry(concentration, receptor, nuclide_data, rho)
+    
+        dimt = Ti(times)
+    
+        stack = DimStack((
+            D = DimArray(D, dimt),
+            H10 = DimArray(H10, dimt),
+        ))
+        return stack
+    end
+
+    return dose_rates
+end
 
 """
     talagrand(dose_rates_results)::Vector{Int}

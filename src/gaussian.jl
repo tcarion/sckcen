@@ -6,6 +6,11 @@ using Dates
 
 const GD = GaussianDispersion
 
+const CONC_LAYERNAME = :conc
+const TIC_LAYERNAME = :TIC
+
+const GAUSSIAN_SAVENAME = "puffs"
+
 gaussiandir(simname::String) = datadir("sims", simname)
 concentrationfile(simname::String) = datadir("sims", simname, "concentration.jld2")
 doseratefile(simname::String) = datadir("sims", simname, "dose_rates.jld2")
@@ -80,35 +85,10 @@ function run_puff(puff::GaussianPuff)
     return timely_conc
 end
 
-function gaussian_puffs(grid::CenteredGrid, relstart, steps, speeds, azimuths, Qs, h)
-    puff = GaussianPuff(
-        grid,
-        relstart,
-        steps,
-        speeds,
-        azimuths,
-        Qs,
-        h
-    )
+function gaussian_puffs(puff::GaussianPuff, times)
 
     timely_conc = run_puff(puff)
-    TIC = reduce((x,y) -> x .+ y * Second(puff.steps[1]).value, timely_conc; init = zero(timely_conc[1]))
-
-    ## Conversion to Dimensional Arrays
-    Xs, Ys, Zs = get_ranges(grid)
-    spatial_dims = (X(Xs), Y(Ys), Z(Zs))
-
-    conc_da = DimArray(
-        cat(timely_conc..., dims = 4),
-        (spatial_dims..., Ti(times))
-    )
-
-    TIC_da = DimArray(
-        TIC,
-        spatial_dims
-    )
-
-    conc_da, TIC_da
+    return to_dimarray(timely_conc, puff.grid, times)
 end
 
 function to_dimarray(timely_conc, grid, times)
@@ -121,16 +101,16 @@ function to_dimarray(timely_conc, grid, times)
     conc_da = DimArray(
         cat(timely_conc..., dims = 4),
         (spatial_dims..., Ti(times));
-        name = :conc
+        name = CONC_LAYERNAME
     )
 
     TIC_da = DimArray(
         TIC,
         spatial_dims;
-        name = :TIC
+        name = TIC_LAYERNAME
     )
 
-    DimStack(conc_da, TIC_da)
+    return DimStack(conc_da, TIC_da)
 end
 
 function rotate_grid(grid_array, θ)

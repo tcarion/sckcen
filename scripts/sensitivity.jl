@@ -35,7 +35,7 @@ puff = GaussianPuff(
     [w[1] for w in winds],
     [w[2] for w in winds],
     RELEASE_RATE,
-    RELHEIGHT
+    RELHEIGHT,
 )
 
 gaussian_montecarlo = GaussianMonteCarlo(puff, Dict(:azimuths => pdf), 3)

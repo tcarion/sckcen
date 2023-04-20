@@ -5,6 +5,7 @@ include("gaussian.jl")
 mc_gaussiandir(simname::String) = datadir("sims", "montecarlo", simname)
 mc_concentrationfile(simname::String) = joinpath(mc_gaussiandir(simname), "concentration.jld2")
 
+const MC_GAUSSIAN_SAVENAME = "puffs"
 
 abstract type AbstractPdf end
 
