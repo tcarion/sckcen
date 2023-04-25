@@ -21,6 +21,8 @@ export ReleasePoint, BBox, make_box
 export FlexExtractRetrieval, FER
 export round_area
 
+const R = Rasters
+
 include("constants.jl")
 include("domain.jl")
 include("geodesy.jl")

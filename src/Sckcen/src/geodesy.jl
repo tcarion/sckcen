@@ -26,3 +26,5 @@ function distance(point1, point2::ENU)
     point1enu = ENU(point1[1], point1[2], point1[3])
     euclidean_distance(point1enu, point2)
 end
+
+distance(point1::LLA, point2::LLA) = euclidean_distance(point1, point2)

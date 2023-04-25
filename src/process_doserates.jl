@@ -6,13 +6,20 @@ using DataFramesMeta
 using Unitful
 using DimensionalData
 using DimensionalData: dims as ddims
+using Geodesy 
 
 include(srcdir("read_datasheet.jl"))
+include(srcdir("parameters.jl"))
+include(srcdir("projections.jl"))
 
 dose_rate_savename(simname) = datadir("sims", simname, "dose_rates.jld2")
 dose_rate_process_savename(simname) = datadir("sims", simname, "dose_rates_process.jld2")
+dose_rate_file(simname::String) = datadir("sims", simname, "dose_rates.jld2")
 
 const DOSE_RATES_SAVENAME = "dose_rates"
+
+# should be depracated
+ensemble_dose_rates_to_df(simname::AbstractString) = ensemble_dose_rates_to_df(load(dose_rate_savename(simname)))
 
 function ensemble_dose_rates_to_df(dose_rates_results)
     each_sensor = map(collect(pairs(dose_rates_results))) do (sensor_name, results)
@@ -33,7 +40,9 @@ end
 dose_rates_to_df(dose_rates_da) = rename!(DataFrame(dose_rates_da), [:Ti, :sensor] .=> [:time, :receptorName])
 dose_rates_to_df(simname::AbstractString) = dose_rates_to_df(load(dose_rate_savename(simname))[DOSE_RATES_SAVENAME])
 
-ensemble_dose_rates_to_df(simname::AbstractString) = ensemble_dose_rates_to_df(load(dose_rate_savename(simname)))
+function join_dose_rates_dfs(simresults::DataFrame, sensors::DataFrame)
+    return innerjoin(simresults, sensors, on = [:receptorName => :longName, :time => :stop])
+end
 
 function to_df_and_save(simname::AbstractString)
     fname = dose_rate_savename(simname)
@@ -54,13 +63,21 @@ mean_and_std(dose_rate_df::DataFrame) = combine(groupby(dose_rate_df, [:receptor
 
 mean_and_std(simname::AbstractString) = mean_and_std(ensemble_dose_rates_to_df(simname))
 
-function gaussian_dose_rates(concentration, sensor_numbers, sensors_dose_rates, nuclide_data = read_lara_file("Se-75"), rho = 0.001161u"g/cm^3")
+function compute_dose_rates(concentration, sensor_numbers, sensors_dose_rates, nuclide_data = read_lara_file("Se-75"), rho = 0.001161u"g/cm^3"; relloc = [RELLON, RELLAT])
     times = ddims(concentration, Ti) |> collect
 
+    raster_crs = crs(concentration)
+
+    trans = ENUfromLLA(LLA(lat = relloc[2], lon = relloc[1]), wgs84)
     dose_rates = map(sensor_numbers) do sensor_number
         location_receptor = get_sensor_location(sensors_dose_rates, sensor_number)
 
-        receptor = trans_enu(LLA(; location_receptor...))
+        receptor_lla = LLA(; location_receptor...)
+        receptor = if raster_crs == EPSG(4326)
+            receptor_lla
+        else
+            trans(receptor_lla)
+        end
     
         D, H10 = time_resolved_dosimetry(concentration, receptor, nuclide_data, rho)
     
@@ -73,7 +90,11 @@ function gaussian_dose_rates(concentration, sensor_numbers, sensors_dose_rates, 
         return stack
     end
 
-    return dose_rates
+    sensor_names = _name_from_number.(sensor_numbers)
+
+    dose_rates_da = cat(dose_rates..., dims = Dim{:sensor}(sensor_names))
+
+    return dose_rates_da
 end
 
 """

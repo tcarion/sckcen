@@ -1,6 +1,7 @@
 using DrWatson
 
 using CairoMakie
+using AlgebraOfGraphics
 
 function plotmarker!(ax, x, y, text; color = :white, fontsize = 12, offset = (0,8))
     p = Point2f(x, y)
@@ -23,3 +24,6 @@ function plotmarker!(ax, x, y, text; color = :white, fontsize = 12, offset = (0,
         strokewidth = 20,
     )
 end
+
+plot_sensor!(ax, data; color = :orange, label = data.receptorName[1]) = scatterlines!(ax, 1:length(data.time), ustrip.(data.value); label, color)
+plot_h10!(ax, data; color = :blue, label = "Simulation") = scatterlines!(ax, 1:length(data.time), ustrip.(data.H10); label, color)

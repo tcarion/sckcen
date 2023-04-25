@@ -13,7 +13,8 @@ include(srcdir("outputs.jl"))
 element_id = :Se75
 simname = "FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0"
 simname = "FirstPuff_OPER_PF_20230329_res=0.0005"
-is_ensemble = true
+simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
+is_ensemble = false
 DOSE_RATE_SAVENAME = dose_rate_savename(simname)
 
 rho = 0.001161u"g/cm^3"
@@ -35,29 +36,31 @@ times = dims(conc, Ti) |> collect
 sensors_dose_rates = read_dose_rate_sensors()
 
 ## Calculate dose rates
-@time dose_rates = map(sensor_numbers) do sensor_number
-    location_receptor = get_sensor_location(sensors_dose_rates, sensor_number)
-    receptor = [location_receptor.lon, location_receptor.lat, location_receptor.alt]
-    
-    # factors_D, factors_H10 = gamma_dose_rate_factors(conc[Ti = 1], location_receptor, nuclide_data, rho)
-    if is_ensemble
+@time dose_rates_da = if is_ensemble
+    #! TO ADAPT!
+    map(sensor_numbers) do sensor_number
+        location_receptor = get_sensor_location(sensors_dose_rates, sensor_number)
+        receptor = [location_receptor.lon, location_receptor.lat, location_receptor.alt]
+        
         dose_for_each_member = map(dims(conc, :member)) do imember
             D, H10 = time_resolved_dosimetry(conc[member = At(imember)], location_receptor, nuclide_data, rho)
             return (; times, D, H10, imember)
         end
-
-        return dose_for_each_member
-    else
-        D, H10 = time_resolved_dosimetry(conc, location_receptor, nuclide_data, rho)
-        return (; times, D, H10)
     end
+else
+    compute_dose_rates(conc, sensor_numbers, sensors_dose_rates, nuclide_data)
 end
+# 61.162754 seconds (520.17 M allocations: 18.220 GiB, 5.45% gc time)
 
-## Save dose rates
-data_to_save = Dict(
-    _name_from_number(sensor_number) => dose_rate for (dose_rate, sensor_number) in zip(dose_rates, sensor_numbers)
+dose_rates_da = DimStack(dose_rates_da...; 
+    metadata = Dict(
+        "simtype" => "flexpart",
+        "ensemble" => is_ensemble,
+        "simname" => simname
+    )
 )
-save(DOSE_RATE_SAVENAME, data_to_save)
+## Save dose rates
+save(dose_rate_file(simname), Dict(DOSE_RATES_SAVENAME => dose_rates_da))
 
 
 

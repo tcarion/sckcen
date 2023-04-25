@@ -13,7 +13,6 @@ const GAUSSIAN_SAVENAME = "puffs"
 
 gaussiandir(simname::String) = datadir("sims", simname)
 concentrationfile(simname::String) = datadir("sims", simname, "concentration.jld2")
-doseratefile(simname::String) = datadir("sims", simname, "dose_rates.jld2")
 
 rotmat(θ) = [
     cosd(θ) -sind(θ) 0;

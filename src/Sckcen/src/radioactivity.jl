@@ -194,10 +194,17 @@ _q(δx, δy, δz) = _q(1., δx, δy, δz)
 
 _distance(source, receptor) = distance(source, receptor) * u"m"
 
-_distance(conc::AbstractDimArray, receptor) = map(CartesianIndices(conc)) do I
-    i, j, k = Tuple(I)
-    source = _getcoords(conc, i, j, k)
-    _distance(source, receptor)
+function _distance(conc::AbstractDimArray, receptor)
+    is_lonlat = crs(conc) == EPSG(4326)
+    map(CartesianIndices(conc)) do I
+        i, j, k = Tuple(I)
+        source = _getcoords(conc, i, j, k)
+        if is_lonlat
+            _distance(LLA(lat = source[2], lon = source[1], alt = source[3]), receptor)
+        else
+            _distance(source, receptor)
+        end
+    end
 end
 
 _mux(mu, source, receptor) = mu * _distance(source, receptor)
@@ -208,7 +215,7 @@ _buildup_factor(Ey, mux) = INTERP_TRUBEY_B(mux, Ey)
 _δDᵣ(prefac, q, B, mux, mu) = prefac * q * B * exp(-mux)/(mux/mu)^2 * 1e9 * 3600
 
 function _getcoords(A::AbstractDimArray, i, j, k)
-    ddims = dims(A, (X, Y, Z))
+    ddims = R.dims(A, (X, Y, Z))
     [ddims[1][i], ddims[2][j], ddims[3][k]]
 end
 
@@ -218,9 +225,9 @@ function _δV(conc)
     if raster_crs == EPSG(4326)
         # In case of lonlat grids, the calculation of the cell volume is not straightforward.
         # For now, we consider the volume to be constant over the grid, which is a valid approximation for small extends.
-        δlon, δlat, δz = step.(dims(conc, (X, Y, Z)))
-        lon1 = dims(conc, X)[1]
-        lat1 = dims(conc, Y)[1]
+        δlon, δlat, δz = step.(R.dims(conc, (X, Y, Z)))
+        lon1 = R.dims(conc, X)[1]
+        lat1 = R.dims(conc, Y)[1]
         # We could have used this commented implementation, which has the benefit of simplicity. This use of the `distance` function
         # is more versatile though.
         # δy = δlat * 111320 

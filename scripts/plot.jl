@@ -1,14 +1,13 @@
 using DrWatson
 using CairoMakie
+using AlgebraOfGraphics
 
-include(srcdir("fp_plot.jl"))
+include(srcdir("plots.jl"))
+include(srcdir("process_doserates.jl"))
 
-simname = "fp_test"
+simname = "OPER_PG"
 
-outfile = first(get_output(simname))
+dose_rates_df = dose_rates_to_df(simname)
 
-stack = RasterStack(outfile)
+## Plot all dose rates for the simulations
 
-spec = Raster(outfile)
-
-heatmap(spec[height = 1, Ti = 10] |> Matrix)
