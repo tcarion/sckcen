@@ -33,6 +33,8 @@ end
 filter_sensor(data, sensor_name::AbstractString) = subset(data, :longName => x -> occursin.(sensor_name, x))
 filter_sensor(data, sensor_number::Int) = filter_sensor(data, _name_from_number(sensor_number))
 
+filter_receptors(data, sensor_names::Vector{<:AbstractString}) = subset(data, :receptorName => ByRow(x -> x in sensor_names))
+filter_receptors(data, sensor_numbers::Vector{Int}) = filter_receptors(data, _name_from_number.(sensor_numbers)) 
 
 get_first_from_name(data, sensor_name::AbstractString) = filter(:longName => ==(sensor_name), data) |> first
 get_first_from_name(data, sensor_number::Int) = get_first_from_name(data, _name_from_number(sensor_number))

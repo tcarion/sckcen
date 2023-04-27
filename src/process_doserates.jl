@@ -5,7 +5,7 @@ using StatsBase: ordinalrank
 using DataFramesMeta
 using Unitful
 using DimensionalData
-using DimensionalData: dims as ddims
+using DimensionalData: dims as ddims, metadata as ddmetadata
 using Geodesy 
 
 include(srcdir("read_datasheet.jl"))
@@ -37,12 +37,22 @@ function ensemble_dose_rates_to_df(dose_rates_results)
     vcat(each_sensor...)
 end
 
-dose_rates_to_df(dose_rates_da) = rename!(DataFrame(dose_rates_da), [:Ti, :sensor] .=> [:time, :receptorName])
+function dose_rates_to_df(dose_rates_da) 
+    df = rename!(DataFrame(dose_rates_da), [:Ti, :sensor] .=> [:time, :receptorName])
+    df.simname .= get(ddmetadata(dose_rates_da), "simname", "")
+    df.simtype .= get(ddmetadata(dose_rates_da), "simtype", "")
+    df.isensemble .= get(ddmetadata(dose_rates_da), "ensemble", false)
+    return df
+end
+
 dose_rates_to_df(simname::AbstractString) = dose_rates_to_df(load(dose_rate_savename(simname))[DOSE_RATES_SAVENAME])
 
 function join_dose_rates_dfs(simresults::DataFrame, sensors::DataFrame)
     return innerjoin(simresults, sensors, on = [:receptorName => :longName, :time => :stop])
 end
+
+merge_dose_rates_results(dfs::Vector{<:DataFrame}) = vcat(dfs...)
+merge_dose_rates_results(names_or_das) = merge_dose_rates_results(dose_rates_to_df.(names_or_das))
 
 function to_df_and_save(simname::AbstractString)
     fname = dose_rate_savename(simname)
