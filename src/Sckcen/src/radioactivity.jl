@@ -215,8 +215,16 @@ _buildup_factor(Ey, mux) = INTERP_TRUBEY_B(mux, Ey)
 _δDᵣ(prefac, q, B, mux, mu) = prefac * q * B * exp(-mux)/(mux/mu)^2 * 1e9 * 3600
 
 function _getcoords(A::AbstractDimArray, i, j, k)
-    ddims = R.dims(A, (X, Y, Z))
-    [ddims[1][i], ddims[2][j], ddims[3][k]]
+    dims = ddims(A, (X, Y, Z))
+    # [dims[1][i], dims[2][j], dims[3][k]]
+    #! Quite suprisingly, replacing with the following line improve general performance by a factor of 4!
+    #! julia> @btime [$dims[1][2], $dims[2][4], $dims[3][7]]
+    #! 560.446 ns (9 allocations: 256 bytes)
+    #! julia> @btime map((x, m) -> x[m], $dims, [2, 4, 7])
+    #! 248.552 ns (10 allocations: 688 bytes)
+    #! julia> @btime map((x, m) -> x[m], $dims, (2, 4, 7))
+    #! 2.686 ns (0 allocations: 0 bytes)
+    map((x, m) -> x[m], dims, (i, j, k))
 end
 
 function _δV(conc)

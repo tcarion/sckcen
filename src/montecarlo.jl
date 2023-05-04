@@ -2,7 +2,7 @@ using Distributions
 
 include("gaussian.jl")
 
-mc_gaussiandir(simname::String) = datadir("sims", "montecarlo", simname)
+mc_gaussiandir(simname::String) = datadir("sims", simname)
 mc_concentrationfile(simname::String) = joinpath(mc_gaussiandir(simname), "concentration.jld2")
 
 const MC_GAUSSIAN_SAVENAME = "puffs"
@@ -35,13 +35,14 @@ function run_puff(puff_mc::GaussianMonteCarlo)
     N = puff_mc.N
     grid_array = collect(puff.grid)
     @unpack speeds, azimuths, rates, h = puff
+    @info "Start running monte carlo puff for $N samples"
     results = map(1:N) do i
+        @info "Sample $i"
         distrib = puff_mc.distributions[:azimuths]
         pdf_azimuths = distrib.(azimuths)
         perturbed_azimuths = log.(rand.(pdf_azimuths))
 
         timely_conc = map(zip(speeds, perturbed_azimuths, rates)) do (wind_speed, wind_azimuth, Q)
-
             pg_class = pasquill_gifford(GD.Strong(), wind_speed) |> collect |> first
             θ = 360. .+ 90. .- wind_azimuth
     
@@ -77,4 +78,6 @@ function gaussian_puffs(puff_mc::GaussianMonteCarlo, times)
 
         DimStack(da..., da_perturb)
     end
+
+    cat(das...; dims = Dim{:member}(1:length(das)))
 end

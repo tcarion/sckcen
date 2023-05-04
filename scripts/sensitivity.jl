@@ -1,6 +1,7 @@
 using DrWatson
 @quickactivate
 
+using Dates
 using JLD2
 
 include(srcdir("montecarlo.jl"))
@@ -24,7 +25,6 @@ times = RELEASE_TIMES
 winds = process_wind.(meteo_ecmwf)
 
 grid = CenteredGrid()
-hist(azimuth_sample)
 
 pdf = ParameterPdf(LogNormal, 10)
 
@@ -38,9 +38,19 @@ puff = GaussianPuff(
     RELHEIGHT,
 )
 
-gaussian_montecarlo = GaussianMonteCarlo(puff, Dict(:azimuths => pdf), 3)
+gaussian_montecarlo = GaussianMonteCarlo(puff, Dict(:azimuths => pdf), 1000)
 puff_mc = gaussian_montecarlo
 
 @time puffs_da = gaussian_puffs(puff_mc, times);
+
+puffs_da = DimStack(puffs_da...; 
+    metadata = Dict(
+        "simtype" => "gaussian",
+        "ensemble" => true,
+        "simname" => simname,
+        "membertype" => "montecarlo",
+        "savedate" => Dates.now()
+    )
+)
 
 jldsave(mc_concentrationfile(simname); puffs = puffs_da)

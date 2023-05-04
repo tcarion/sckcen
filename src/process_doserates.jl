@@ -17,6 +17,7 @@ dose_rate_process_savename(simname) = datadir("sims", simname, "dose_rates_proce
 dose_rate_file(simname::String) = datadir("sims", simname, "dose_rates.jld2")
 
 const DOSE_RATES_SAVENAME = "dose_rates"
+const DOSE_RATES_FILENAME = "dose_rates.jld2"
 
 # should be depracated
 ensemble_dose_rates_to_df(simname::AbstractString) = ensemble_dose_rates_to_df(load(dose_rate_savename(simname)))
@@ -47,11 +48,15 @@ end
 
 dose_rates_to_df(simname::AbstractString) = dose_rates_to_df(load(dose_rate_savename(simname))[DOSE_RATES_SAVENAME])
 
-function join_dose_rates_dfs(simresults::DataFrame, sensors::DataFrame)
-    return innerjoin(simresults, sensors, on = [:receptorName => :longName, :time => :stop])
+function join_dose_rates_sensors(simresults::DataFrame, sensors::DataFrame)
+    newsens = rename(sensors, [:longName, :stop, :value] .=> [:receptorName, :time, :H10])
+    newsens.simtype .= "measure"
+    newsens.isensemble .= false
+    return vcat(simresults, newsens; cols = :union)
 end
+join_dose_rates_sensors(simresults::DataFrame) = join_dose_rates_sensors(simresults, remove_background(read_dose_rate_sensors()))
 
-merge_dose_rates_results(dfs::Vector{<:DataFrame}) = vcat(dfs...)
+merge_dose_rates_results(dfs::Vector{<:DataFrame}) = vcat(dfs...; cols=:union)
 merge_dose_rates_results(names_or_das) = merge_dose_rates_results(dose_rates_to_df.(names_or_das))
 
 function to_df_and_save(simname::AbstractString)
@@ -80,6 +85,7 @@ function compute_dose_rates(concentration, sensor_numbers, sensors_dose_rates, n
 
     trans = ENUfromLLA(LLA(lat = relloc[2], lon = relloc[1]), wgs84)
     dose_rates = map(sensor_numbers) do sensor_number
+        @info "Sensor number: $sensor_number"
         location_receptor = get_sensor_location(sensors_dose_rates, sensor_number)
 
         receptor_lla = LLA(; location_receptor...)

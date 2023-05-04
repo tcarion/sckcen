@@ -27,7 +27,7 @@ dose_rates_da = DimStack(dose_rates_da...;
     metadata = Dict(
         "simtype" => "gaussian",
         "ensemble" => false,
-        "simname" => simname
+        "simname" => simname,
     )
 )
 

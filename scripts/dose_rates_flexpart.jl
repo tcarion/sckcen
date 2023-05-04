@@ -3,6 +3,7 @@ using DrWatson
 using Sckcen
 using Unitful
 using Rasters
+using Rasters: dims as ddims
 using JLD2
 using Flexpart
 
@@ -11,10 +12,11 @@ include(srcdir("process_doserates.jl"))
 include(srcdir("outputs.jl"))
 
 element_id = :Se75
-simname = "FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0"
 simname = "FirstPuff_OPER_PF_20230329_res=0.0005"
 simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
-is_ensemble = false
+simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=5000.0"
+simname = "FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0"
+is_ensemble = true
 DOSE_RATE_SAVENAME = dose_rate_savename(simname)
 
 rho = 0.001161u"g/cm^3"
@@ -31,37 +33,42 @@ if is_ensemble
 else
     conc = prepare_output_for_doserate(simname)
 end
-times = dims(conc, Ti) |> collect
+times = ddims(conc, Ti) |> collect
 
 sensors_dose_rates = read_dose_rate_sensors()
 
 ## Calculate dose rates
+@info "Starting dose rates computation for simulation: $simname"
 @time dose_rates_da = if is_ensemble
-    #! TO ADAPT!
-    map(sensor_numbers) do sensor_number
-        location_receptor = get_sensor_location(sensors_dose_rates, sensor_number)
-        receptor = [location_receptor.lon, location_receptor.lat, location_receptor.alt]
-        
-        dose_for_each_member = map(dims(conc, :member)) do imember
-            D, H10 = time_resolved_dosimetry(conc[member = At(imember)], location_receptor, nuclide_data, rho)
-            return (; times, D, H10, imember)
-        end
+    dose_for_each_member = map(ddims(conc, :member)) do imember
+        @info "Computing membmer $imember"
+        compute_dose_rates(conc[member = At(imember)], sensor_numbers, sensors_dose_rates, nuclide_data)
     end
+
+    # dose_for_each_member = mapslices(conc[:,:,:,:,1:2]; dims = :member) do one_member
+    #     # @info "Computing membmer $(refdims(one_member, :member)[1])"
+    #     println(typeof(one_member))
+    #     # compute_dose_rates(one_member, sensor_numbers, sensors_dose_rates, nuclide_data)
+    # end
+
+    cat(dose_for_each_member...; dims = ddims(conc, :member))
 else
     compute_dose_rates(conc, sensor_numbers, sensors_dose_rates, nuclide_data)
 end
 # 61.162754 seconds (520.17 M allocations: 18.220 GiB, 5.45% gc time)
+# now: 152.530969 seconds (2.21 M allocations: 44.482 GiB, 1.80% gc time, 0.66% compilation time)
 
 dose_rates_da = DimStack(dose_rates_da...; 
     metadata = Dict(
         "simtype" => "flexpart",
         "ensemble" => is_ensemble,
-        "simname" => simname
+        "simname" => simname,
+        "membertype" => is_ensemble ? "ensemble_forecast" : ""
     )
 )
 ## Save dose rates
 save(dose_rate_file(simname), Dict(DOSE_RATES_SAVENAME => dose_rates_da))
-
+@info "Dose rates saved at $(dose_rate_file(simname))"
 
 
 ##
