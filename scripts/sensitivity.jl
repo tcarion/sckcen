@@ -1,4 +1,4 @@
-using DrWatson
+  using DrWatson
 @quickactivate
 
 using Dates
@@ -54,3 +54,4 @@ puffs_da = DimStack(puffs_da...;
 )
 
 jldsave(mc_concentrationfile(simname); puffs = puffs_da)
+@info "Concentration calculated with MonteCarlo and saved at $(mc_concentrationfile(simname))"

@@ -34,7 +34,7 @@ function plot_sensor!(ax, data; color = :orange, label = data.receptorName[1])
 end
 plot_h10!(ax, data; color = :blue, label = "Simulation") = scatterlines!(ax, 1:length(data.time), ustrip.(data.H10); label, color)
 
-function plot_smart_doses(df)
+function plot_smart_doses(df; Ncols = 3)
     alltimes = unique(df.time)
     itimes = 1:length(alltimes)
     yunit = unit(df.H10[1])
@@ -45,12 +45,16 @@ function plot_smart_doses(df)
     simcolors = Makie.wong_colors()
     simcolors = [:red, :blue, :green, :yellow, :purple]
 
-    f = Figure(;resolution = (1200, 400))
+    ax_indices = fldmod1.(1:Nplots, Ncols)
+    f = Figure(;
+        # resolution = (1200, 400)
+    )
     ga = f[1, 1] = GridLayout()
-    axs = [Axis(ga[1, i]) for i in 1:Nplots]
+    axs = [Axis(ga[row, col]) for (row, col) in ax_indices]
     labels = String[]
 
     for (i, sensor_key) in enumerate(keys(by_sensor))
+        row, col = ax_indices[i]
         cur_ax = axs[i]
         one_sensor = by_sensor[sensor_key]
         sensor_name = sensor_key[1]
@@ -94,7 +98,7 @@ function plot_smart_doses(df)
             end
         end
         # xrange = col == 1 ? (0:0.1:6pi) : (0:0.1:10pi)
-        if i == 1
+        if col == 1
             cur_ax.ylabel = "H10 [$yunit]"
         else
             # cur_ax.yticks = nothing

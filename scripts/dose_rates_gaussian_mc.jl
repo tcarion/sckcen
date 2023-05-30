@@ -2,7 +2,7 @@ using DrWatson
 @quickactivate
 
 using JLD2
-using DimensionalData: dims as ddims
+using DimensionalData: dims as ddims, metadata as dmetadata
 using Sckcen
 
 include(srcdir("montecarlo.jl"))
@@ -27,7 +27,7 @@ end
 dose_rates_da = cat(dose_for_each_member...; dims = ddims(puffs, :member))
 
 dose_rates_da = DimStack(dose_rates_da...; 
-    metadata = metadata(puffs)
+    metadata = dmetadata(puffs)
 )
 
 ## Save dose rates

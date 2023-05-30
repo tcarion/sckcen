@@ -114,29 +114,29 @@ function compute_dose_rates(concentration, sensor_numbers, sensors_dose_rates, n
 end
 
 """
-    talagrand(dose_rates_results)::Vector{Int}
+    talagrand(dose_rates_results)
 Compute the ranks of every observation according to the ensemble results. This can be used to draw a Telegrand histogram (rank-histogram).
 
 ## Reference
 https://www.statisticshowto.com/rank-histogram/
 """
-function talagrand(dose_rates_df)::Vector{Int}
+function talagrand(dose_rates_df)
     sensors_dose_rates = read_dose_rate_sensors()
     sensors_dose_rates = remove_background(sensors_dose_rates)
     sensors_dose_rates.member .= -1 # We flag the member to -1 to note it is observations
 
     sensors_formated = @chain sensors_dose_rates begin
-        rename(_, [:longName, :value, :stop] .=> [:receptorName, :H10, :times])
-        @rsubset :times <= maximum(dose_rates_df.times) && :times >= minimum(dose_rates_df.times)
+        rename(_, [:longName, :value, :stop] .=> [:receptorName, :H10, :time])
+        @rsubset :time <= maximum(dose_rates_df.time) && :time >= minimum(dose_rates_df.time)
         @rsubset :receptorName in unique(dose_rates_df.receptorName)
-        @select(:receptorName, :times, :H10, :member)
+        @select(:receptorName, :time, :H10, :member)
     end
-    append = vcat(select(dose_rates_df, Not(:D)), sensors_formated)
+    append = vcat(select(dose_rates_df, [:time, :receptorName, :member, :H10]), sensors_formated)
 
-    by_obs = groupby(append, [:times, :receptorName])
+    by_obs = groupby(append, [:time, :receptorName])
 
     ranked = transform(by_obs, :H10 => (x -> ordinalrank(x)) => :rank)
 
     obs_rank = @rsubset ranked :member == -1
-    return obs_rank.rank
+    return obs_rank
 end
