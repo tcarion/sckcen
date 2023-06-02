@@ -77,7 +77,10 @@ end
 
 function SimParams(name::String, input::String; kw...)
     inputpath = datadir("extractions", input, "output")
-    isdir(inputpath) || error("input dir not existing")
+    if !isdir(inputpath)
+        inputpath = datadir("extractions", input)
+        isdir(inputpath) || error("input dir $inputpath not existing")
+    end
     isempty(readdir(inputpath)) && error("no flexpart input files in the input directory")
     SimParams(; name, input = inputpath, kw...)
 end

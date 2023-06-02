@@ -9,8 +9,9 @@ simnames = ["OPER_PG", "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0", "First
 simnames = ["OPER_PG", "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0", "FirstPuff_OPER_res=0. 0001_timestep=10_we=5000.0"]
 simnames = ["FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0", "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"]
 simnames = ["OPER_PG_LOGNORM_AZIMUTH"]
+simnames = ["ENFO_BE_20190513T00_res=0.0001_timestep=10_we=1000.0"]
 
-sensor_numbers = [3, 4, 15, 2]
+sensor_numbers = [3, 4, 15]
 
 results_df = merge_dose_rates_results(simnames)
 

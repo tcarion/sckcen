@@ -3,7 +3,10 @@ using Distributed
 # see https://github.com/JuliaParallel/ClusterManagers.jl
 # https://discourse.julialang.org/t/running-julia-in-a-slurm-cluster/67614
 
-addprocs(10; exeflags="--project")
+# see also https://researchcomputing.princeton.edu/support/knowledge-base/julia
+
+num_cores = parse(Int, ENV["SLURM_NPROCS"])
+addprocs(num_cores; exeflags="--project")
 # n_workers = parse(Int , ENV["SLURM_NTASKS"])
 # addprocs_slurm(n_workers , topology =:master_worker)
 

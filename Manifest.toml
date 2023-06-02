@@ -569,7 +569,7 @@ version = "0.3.0"
 deps = ["CommonDataModel", "DataStructures", "Dates", "DiskArrays", "GRIB"]
 path = "/home/tcarion/.julia/dev/GRIBDatasets"
 uuid = "82be9cdb-ee19-4151-bdb3-b400788d9abc"
-version = "0.2.0"
+version = "0.2.1"
 
 [[deps.GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Qt5Base_jll", "Zlib_jll", "libpng_jll"]
