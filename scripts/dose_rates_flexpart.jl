@@ -17,6 +17,10 @@ simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
 simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=5000.0"
 simname = "FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0"
 simname = "ENFO_BE_20190513T00_res=0.0001_timestep=10_we=1000.0"
+simname = "ENFO_BE_20190513T12_res=0.0001_timestep=10_we=1000.0"
+simname = "ENFO_BE_20190514T00_res=0.0001_timestep=10_we=1000.0"
+simname = "ENFO_BE_20190514T12_res=0.0001_timestep=10_we=1000.0"
+simname = "ENFO_BE_20190515T00_res=0.0001_timestep=10_we=1000.0"
 
 is_ensemble = true
 DOSE_RATE_SAVENAME = dose_rate_savename(simname)

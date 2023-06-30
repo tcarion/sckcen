@@ -2,6 +2,7 @@ using DrWatson
 using XLSX
 using Dates
 using DataFrames
+using DataFrames: combine
 using DataFrames: subset
 using Unitful
 using Statistics

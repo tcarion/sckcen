@@ -2,6 +2,7 @@ using DrWatson
 using DataFrames
 using DataFramesMeta
 using Makie
+using Statistics
 # using AlgebraOfGraphics
 
 function plotmarker!(ax, x, y, text; color = :white, fontsize = 12, offset = (0,8))
@@ -120,6 +121,82 @@ function plot_smart_doses(df; Ncols = 3)
     #     valign = :top,
     #     halign = :center
     # )
+    f
+end
+
+function plot_each_spread!(ax, by_recept; base_date = DateTime("2019-05-15T14:00:00"))
+    nrecept = length(unique(by_recept.receptorName))
+    nrecept !== 1 && error("Only 1 receptor allowed, got $nrecept")
+    by_fc = groupby(by_recept, :forecast_start)
+    colors = [:blue, :red, :green, :purple, :yellow]
+    for (i, fc_key) in enumerate(keys(by_fc))
+        fc = by_fc[fc_key]
+        fc_start = fc_key.forecast_start
+        diffh = Hour(base_date - DateTime(fc_start)).value
+        plot_spread!(ax, fc; label = "T-$(diffh)h", color = colors[i])
+    end
+end
+
+function plot_obs!(ax, obs)
+    scatterlines!(ax, 1:nrow(obs), ustrip.(obs.value); label="obs", markersize = 3, color = :black)
+end
+
+function plot_spread!(ax, data; color = :blue, label = "", with_fun = mean)
+    H10 = combine(groupby(data, :time), :H10 => with_fun => :mean_or_median)
+    H10_std = combine(groupby(data, :time), :H10 => std)
+    alltimes = unique(data.time)
+    itimes = 1:length(alltimes)
+    means = ustrip.(H10.mean_or_median)
+    spreads = ustrip.(H10_std.H10_std)
+    scatterlines!(ax, itimes, means; color, label)
+    band!(ax, itimes, means .- spreads, means .+ spreads; color = (color, 0.2))
+end
+
+function plot_spreads_all_receptors(ens, oper, obs; receptors = ["IMR/M03", "IMR/M04", "IMR/M15"], resolution = (1200, 650))
+    Nplots = length(receptors)
+    # ax_indices = fldmod1.(1:Nplots, Ncols)
+    yunit = unit(ens.H10[1])
+    
+    f = Figure(; resolution)
+    ga = f[1,1] = GridLayout()
+    alltimes = unique(ens.time)
+    itimes = 1:length(alltimes) 
+    # axs = [Axis(ga[row, col]) for (row, col) in ax_indices]
+    axs_each = [Axis(ga[1, i]) for i in 1:length(receptors)]
+    axs_all = [Axis(ga[2, i]) for i in 1:length(receptors)]
+
+    for (i, receptor) in enumerate(receptors)
+        ax_each = axs_each[i]
+        ax_each.title = receptor
+        ax_each.xticks = (itimes, Dates.format.(Time.(alltimes), "HH:MM"))
+
+        ylims!(ax_each, -2, 6)
+        plot_obs!(ax_each, @rsubset obs :longName == receptor)
+        plot_each_spread!(ax_each, @rsubset ens :receptorName==receptor)
+
+
+        ax_all = axs_all[i]
+        ax_all.xticks = (itimes, Dates.format.(Time.(alltimes), "HH:MM"))
+        ax_all.xticklabelrotation = deg2rad(10)
+        ylims!(ax_all, -2, 6)
+
+        plot_obs!(ax_all, @rsubset obs :longName == receptor)
+        plot_spread!(ax_all, @rsubset ens :receptorName == receptor; color = :blue, label = "all ens")
+        scatterlines!(ax_all, itimes, ustrip.((@rsubset oper :receptorName == receptor).H10); color = :red, label = "deterministic")
+
+        if i == 1
+            axislegend(ax_each)
+            axislegend(ax_all)
+            ax_each.ylabel = "H10 [$yunit]"
+            ax_all.ylabel = "H10 [$yunit]"
+        else
+            hideydecorations!(ax_each, grid=false)
+            hideydecorations!(ax_all, grid=false)
+        end
+        hidexdecorations!(ax_each, grid=false)
+    end
+    colgap!(ga, 0)
+    rowgap!(ga, 10)
     f
 end
 

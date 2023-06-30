@@ -1,5 +1,6 @@
 using DrWatson
 using DataFrames
+using DataFrames: combine
 using StatsBase
 using StatsBase: ordinalrank
 using DataFramesMeta
@@ -20,22 +21,27 @@ const DOSE_RATES_SAVENAME = "dose_rates"
 const DOSE_RATES_FILENAME = "dose_rates.jld2"
 
 # should be depracated
-ensemble_dose_rates_to_df(simname::AbstractString) = ensemble_dose_rates_to_df(load(dose_rate_savename(simname)))
+ensemble_dose_rates_to_df(simname::AbstractString) = ensemble_dose_rates_to_df(load(dose_rate_savename(simname))[DOSE_RATES_SAVENAME])
 
-function ensemble_dose_rates_to_df(dose_rates_results)
-    each_sensor = map(collect(pairs(dose_rates_results))) do (sensor_name, results)
-        dfs = [DataFrame(
-            times = result.times, 
-            D = result.D, 
-            H10 = result.H10,
-            member = fill(result.imember, length(result.H10))
-        ) for result in results]
+function ensemble_dose_rates_to_df(dose_rates_da)
+    # each_sensor = map(collect(pairs(dose_rates_results))) do (sensor_name, results)
+    #     dfs = [DataFrame(
+    #         times = result.times, 
+    #         D = result.D, 
+    #         H10 = result.H10,
+    #         member = fill(result.imember, length(result.H10))
+    #     ) for result in results]
     
-        df = vcat(dfs...)
-        df.receptorName .= sensor_name
-        return df
-    end
-    vcat(each_sensor...)
+    #     df = vcat(dfs...)
+    #     df.receptorName .= sensor_name
+    #     return df
+    # end
+    # vcat(each_sensor...)
+    df = rename!(DataFrame(dose_rates_da), [:Ti, :sensor] .=> [:time, :receptorName])
+    df.simname .= get(ddmetadata(dose_rates_da), "simname", "")
+    df.simtype .= get(ddmetadata(dose_rates_da), "simtype", "")
+    df.isensemble .= get(ddmetadata(dose_rates_da), "ensemble", true)
+    return df
 end
 
 function dose_rates_to_df(dose_rates_da) 
@@ -47,6 +53,16 @@ function dose_rates_to_df(dose_rates_da)
 end
 
 dose_rates_to_df(simname::AbstractString) = dose_rates_to_df(load(dose_rate_savename(simname))[DOSE_RATES_SAVENAME])
+
+function aggregate_sims(sims)
+    dose_rates_per_sim = map(collect(sims)) do (simname, fc_time)
+        dose_rates_df = dose_rates_to_df(simname)
+        dose_rates_df[:, :forecast_start] .= fc_time
+        dose_rates_df
+    end
+    
+    return vcat(dose_rates_per_sim...)
+end
 
 function join_dose_rates_sensors(simresults::DataFrame, sensors::DataFrame)
     newsens = rename(sensors, [:longName, :stop, :value] .=> [:receptorName, :time, :H10])
@@ -70,6 +86,19 @@ function to_df_and_save(simname::AbstractString)
         return f["df"]
     end
 end
+
+function filter_times_receptors(df, 
+    receptors = ["IMR/M03", "IMR/M04", "IMR/M15"], 
+    left = DateTime("2019-05-15T15:20:00"), 
+    right = DateTime("2019-05-15T16:10:00");
+)
+    return @chain df begin
+        @rsubset _ :receptorName in receptors
+        @rsubset _ :time >= left
+        @rsubset _ :time <= right
+    end
+end
+
 """
     mean_and_std(dose_rate_df::DataFrame)
 Compute the mean and standard deviation of the members for each time steps.
@@ -123,6 +152,10 @@ https://www.statisticshowto.com/rank-histogram/
 function talagrand(dose_rates_df)
     sensors_dose_rates = read_dose_rate_sensors()
     sensors_dose_rates = remove_background(sensors_dose_rates)
+    talagrand(dose_rates_df, sensors_dose_rates)
+end
+
+function talagrand(dose_rates_df, sensors_dose_rates)
     sensors_dose_rates.member .= -1 # We flag the member to -1 to note it is observations
 
     sensors_formated = @chain sensors_dose_rates begin
@@ -139,4 +172,10 @@ function talagrand(dose_rates_df)
 
     obs_rank = @rsubset ranked :member == -1
     return obs_rank
+end
+
+function bias(dose_rates_df, sensors_dose_rates)
+    mean_sim = mean(dose_rates_df.H10) 
+    mean_obs = mean(sensors_dose_rates.value)
+    mean_sim - mean_obs
 end

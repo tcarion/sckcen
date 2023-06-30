@@ -3,6 +3,7 @@ using Flexpart
 using Unitful
 using Sckcen
 using Logging
+using TimeZones
 
 include(srcdir("fp_prepare.jl"))
 
@@ -10,7 +11,7 @@ include(srcdir("fp_prepare.jl"))
 FORCE_CREATE = false
 element_id = :Se75
 # run_name = "FirstPuff_ELDA"
-run_name = "ENFO_BE_20190514T00"
+run_name = "ENFO_BE_20190515T00"
 
 res = 0.0005
 res = 0.0001
@@ -24,7 +25,7 @@ rates_windows = [9.1, 8.6, 4.1, 1.6, 1.0, 0.9] .* u"MBq/s"
 
 sourceterms = build_source_terms(element_id, source_start, source_windows, rates_windows)
 
-input_dir = "ENFO/2019051400/PF"
+input_dir = "ENFO/2019051500/PF"
 
 sim = SimParams(run_name, input_dir;
     res = res,
@@ -62,7 +63,7 @@ avs = Available(fpsim)
 
 # Add 1 hour because of time offset
 for input in avs
-    input.time = input.time + Dates.Hour(1)
+    input.time = DateTime(astimezone(ZonedDateTime(input.time, tz"UTC"), tz"Europe/Brussels"))
 end
 
 saveddir = Flexpart.save(avs)
