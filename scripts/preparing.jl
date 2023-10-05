@@ -59,7 +59,6 @@ Flexpart.save(fpoptions)
 
 avs = Available(fpsim)
 
-# Change the AVAILABLE for correcting the timezone difference. Should be easier to do that, will need to reimplement Flexpart...
 for input in avs
     input.time = DateTime(astimezone(ZonedDateTime(input.time, tz"UTC"), tz"Europe/Brussels"))
 end
