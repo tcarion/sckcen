@@ -4,6 +4,7 @@ using Sckcen
 using Unitful
 using Rasters
 using Rasters: dims as ddims
+import NCDatasets
 using JLD2
 using Flexpart
 
@@ -13,15 +14,14 @@ include(srcdir("outputs.jl"))
 
 element_id = :Se75
 simname = "FirstPuff_OPER_PF_20230329_res=0.0005"
-simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
 simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=5000.0"
+simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
 simname = "FirstPuff_ELDA_res=0.0001_timestep=10_we=1000.0"
-simname = "ENFO_BE_20190513T00_res=0.0001_timestep=10_we=1000.0"
-simname = "ENFO_BE_20190513T12_res=0.0001_timestep=10_we=1000.0"
-simname = "ENFO_BE_20190514T00_res=0.0001_timestep=10_we=1000.0"
-simname = "ENFO_BE_20190514T12_res=0.0001_timestep=10_we=1000.0"
 simname = "ENFO_BE_20190515T00_res=0.0001_timestep=10_we=1000.0"
-
+simname = "ENFO_BE_20190513T00_res=0.0001_timestep=10_we=1000.0"
+simname = "ENFO_BE_20190514T12_res=0.0001_timestep=10_we=1000.0"
+simname = "ENFO_BE_20190514T00_res=0.0001_timestep=10_we=1000.0"
+simname = "ENFO_BE_20190513T12_res=0.0001_timestep=10_we=1000.0"
 is_ensemble = true
 DOSE_RATE_SAVENAME = dose_rate_savename(simname)
 
@@ -39,6 +39,7 @@ if is_ensemble
 else
     conc = prepare_output_for_doserate(simname)
 end
+conc = Rasters.setcrs(conc, EPSG(4326))
 times = ddims(conc, Ti) |> collect
 
 sensors_dose_rates = read_dose_rate_sensors()
@@ -64,14 +65,13 @@ end
 # 61.162754 seconds (520.17 M allocations: 18.220 GiB, 5.45% gc time)
 # now: 152.530969 seconds (2.21 M allocations: 44.482 GiB, 1.80% gc time, 0.66% compilation time)
 
-dose_rates_da = DimStack(dose_rates_da...; 
-    metadata = Dict(
-        "simtype" => "flexpart",
-        "ensemble" => is_ensemble,
-        "simname" => simname,
-        "membertype" => is_ensemble ? "ensemble_forecast" : ""
-    )
-)
+dose_rates_da = DD.rebuild(dose_rates_da, metadata = Dict(
+    "simtype" => "flexpart",
+    "ensemble" => is_ensemble,
+    "simname" => simname,
+    "membertype" => is_ensemble ? "ensemble_forecast" : ""
+))
+
 ## Save dose rates
 save(dose_rate_file(simname), Dict(DOSE_RATES_SAVENAME => dose_rates_da))
 @info "Dose rates saved at $(dose_rate_file(simname))"
