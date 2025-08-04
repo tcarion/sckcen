@@ -18,7 +18,7 @@ function InputArrays(filepath::String; tosave = ("u", "v", "t"))
 
     lons = X(ds["lon"][:])
     lats = Y(ds["lat"][:])
-    heights = Z(level_heights(filepath))
+    heights = Z(level_heights(filepath))[1:length(ds["hybrid"])]
     dims = (lons, lats, heights)
 
     saved = map(tosave) do var
@@ -46,8 +46,15 @@ function Base.show(io::IO, mime::MIME"text/plain", o::BoundingInputs)
 end
 
 
-function BoundingInputs(inputdir::String, date::DateTime)
-    infiles = bound_input_files(inputdir, date)
+function BoundingInputs(inputdir::String, date::DateTime; member=nothing)
+    if isnothing(member)
+        infiles = bound_input_files(inputdir, date)
+    else
+        inputs = Flexpart.inputs_from_dir(inputdir)
+        inputs = filter(x -> x.member == member, inputs)
+        i = findfirst(x -> date < x.time, inputs)
+        infiles = getpath(inputs[i - 1]), getpath(inputs[i])
+    end
     BoundingInputs(InputArrays(infiles[1]), InputArrays(infiles[2]))
 end
 
@@ -83,8 +90,8 @@ function process_wind(un, vn)
 end
 process_wind(meteo::NamedTuple) = process_wind(meteo.u, meteo.v)
 
-function extract_meteo_ecmwf(inputdir::String, times::Vector{<:DateTime})
-    bounding_inputs = BoundingInputs(inputdir, first(times))
+function extract_meteo_ecmwf(inputdir::String, times::Vector{<:DateTime}; member = nothing)
+    bounding_inputs = BoundingInputs(inputdir, first(times); member)
     t1, t2 = time_bounds(bounding_inputs)
     res = []
     for time in times
@@ -159,7 +166,7 @@ Read the A_{k+1/2} and B_{k+1/2}, the model level coefficients at the half level
 function read_levels_coefs(file::String)
     coefs = Index(file, "typeOfLevel") do index
         # Find a message with hybrid levels
-        select!(index, "typeOfLevel", "hybrid")
+        GRIB.select!(index, "typeOfLevel", "hybrid")
         # Get the coefficients for vertical level transformation
         Message(index)["pv"]
     end
@@ -180,8 +187,8 @@ function full_level_pressures(ahs, bhs, ps = ISA_MSL_PRESSURE)
     0.5*(phs[2:end] + phs[1:end-1])
 end
 
-function level_heights(file::String, ps = ISA_MSL_PRESSURE)
-    ahs, bhs = read_levels_coefs(file)
+function level_heights(filepath::String, ps = ISA_MSL_PRESSURE)
+    ahs, bhs = read_levels_coefs(filepath)
     phs = half_level_pressure.(ahs, bhs, ps)
     full_press = 0.5*(phs[2:end] + phs[1:end-1]) 
     pressure_to_height.(full_press)

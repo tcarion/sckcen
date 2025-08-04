@@ -27,11 +27,11 @@ function plotmarker!(ax, x, y, text; color = :white, fontsize = 12, offset = (0,
     )
 end
 
-function plot_sensor!(ax, data; color = :orange, label = data.receptorName[1])
+function plot_sensor!(ax, data; color = :orange, label = data.receptorName[1], witherror=true)
     xs = 1:length(data.time)
     ys = ustrip.(data.H10)
     scatterlines!(ax, xs, ys; label, color, markersize = 3)
-    errorbars!(ax, xs, ys, ustrip.(data.value_std); color = (color, 0.7), whiskerwidth = 9, label)
+    witherror && errorbars!(ax, xs, ys, ustrip.(data.value_std); color = (color, 0.7), whiskerwidth = 9, label)
 end
 plot_h10!(ax, data; color = :blue, label = "Simulation") = scatterlines!(ax, 1:length(data.time), ustrip.(data.H10); label, color)
 
@@ -133,7 +133,7 @@ function plot_each_spread!(ax, by_recept; base_date = DateTime("2019-05-15T14:00
         fc = by_fc[fc_key]
         fc_start = fc_key.forecast_start
         diffh = Hour(base_date - DateTime(fc_start)).value
-        plot_spread!(ax, fc; label = "T-$(diffh)h", color = colors[i])
+        (ax, fc; label = "T-$(diffh)h", color = colors[i])
     end
 end
 
@@ -141,7 +141,7 @@ function plot_obs!(ax, obs)
     scatterlines!(ax, 1:nrow(obs), ustrip.(obs.value); label="obs", markersize = 3, color = :black)
 end
 
-function plot_spread!(ax, data; color = :blue, label = "", with_fun = mean)
+function (ax, data; color = :blue, label = "", with_fun = mean)
     H10 = combine(groupby(data, :time), :H10 => with_fun => :mean_or_median)
     H10_std = combine(groupby(data, :time), :H10 => std)
     alltimes = unique(data.time)
@@ -181,7 +181,7 @@ function plot_spreads_all_receptors(ens, oper, obs; receptors = ["IMR/M03", "IMR
         ylims!(ax_all, -2, 6)
 
         plot_obs!(ax_all, @rsubset obs :longName == receptor)
-        plot_spread!(ax_all, @rsubset ens :receptorName == receptor; color = :blue, label = "all ens")
+        (ax_all, @rsubset ens :receptorName == receptor; color = :blue, label = "all ens")
         scatterlines!(ax_all, itimes, ustrip.((@rsubset oper :receptorName == receptor).H10); color = :red, label = "deterministic")
 
         if i == 1

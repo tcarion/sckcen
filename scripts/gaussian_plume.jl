@@ -15,7 +15,7 @@ simname = "OPER_PG"
 
 relstart = DateTime(RELSTART)
 
-inputdir = "/home/tcarion/projects/sckcen/data/extractions/OPER_20190515/output"
+inputdir = "/home/tricarion/Documents/sckcen/data/extractions/OPER_20190515/output"
 
 times = RELEASE_TIMES
 

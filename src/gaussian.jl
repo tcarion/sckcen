@@ -79,7 +79,9 @@ function run_puff(puff::GaussianPuff)
         # @btime conc = [plume(x, y, z) for x in Xs, y in Ys, z in Zs]
         # 94.425 ms (3427544 allocations: 70.28 MiB)
 
-        [plume(point...) for point in gridrot]
+        conc = [plume(point...) for point in gridrot]
+        conc[findall(isnan, conc)] .= 0. # The GaussianDispersion gives NaN at origin for some reason
+        conc
     end
     return timely_conc
 end
