@@ -55,6 +55,7 @@ function calc_background(
     )
 
     windowed = isnothing(time_window) ? data : filter(row -> row.start >= time_window[1] && row.stop <= time_window[2], data)
+    windowed = isnothing(time_window) ? data : filter(row -> row.start >= time_window[1] && row.stop < time_window[2], data)
     # select(groupby(data, :longName), :value => mean)
     # returns
 #     1440×2 DataFrame

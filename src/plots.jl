@@ -133,7 +133,7 @@ function plot_each_spread!(ax, by_recept; base_date = DateTime("2019-05-15T14:00
         fc = by_fc[fc_key]
         fc_start = fc_key.forecast_start
         diffh = Hour(base_date - DateTime(fc_start)).value
-        (ax, fc; label = "T-$(diffh)h", color = colors[i])
+        plot_spread!(ax, fc; label = "T-$(diffh)h", color = colors[i])
     end
 end
 
@@ -141,14 +141,14 @@ function plot_obs!(ax, obs)
     scatterlines!(ax, 1:nrow(obs), ustrip.(obs.value); label="obs", markersize = 3, color = :black)
 end
 
-function (ax, data; color = :blue, label = "", with_fun = mean)
+function plot_spread!(ax, data; color = :blue, label = "", linestyle = :solid, with_fun = mean)
     H10 = combine(groupby(data, :time), :H10 => with_fun => :mean_or_median)
     H10_std = combine(groupby(data, :time), :H10 => std)
     alltimes = unique(data.time)
     itimes = 1:length(alltimes)
     means = ustrip.(H10.mean_or_median)
     spreads = ustrip.(H10_std.H10_std)
-    scatterlines!(ax, itimes, means; color, label)
+    scatterlines!(ax, itimes, means; color, label, linestyle)
     band!(ax, itimes, means .- spreads, means .+ spreads; color = (color, 0.2))
 end
 
@@ -181,7 +181,7 @@ function plot_spreads_all_receptors(ens, oper, obs; receptors = ["IMR/M03", "IMR
         ylims!(ax_all, -2, 6)
 
         plot_obs!(ax_all, @rsubset obs :longName == receptor)
-        (ax_all, @rsubset ens :receptorName == receptor; color = :blue, label = "all ens")
+        plot_spread!(ax_all, @rsubset ens :receptorName == receptor; color = :blue, label = "all ens")
         scatterlines!(ax_all, itimes, ustrip.((@rsubset oper :receptorName == receptor).H10); color = :red, label = "deterministic")
 
         if i == 1

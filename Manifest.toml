@@ -2,7 +2,7 @@
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "52f68c00273bb96d745e3cbc40aa3313f77c7cfc"
+project_hash = "d4b6461de9db9b8b4d69acdb1685849c6f48d11b"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -392,9 +392,9 @@ version = "0.6.3"
 
 [[deps.CoordRefSystems]]
 deps = ["Random", "Rotations", "StaticArrays", "Unitful", "Zygote"]
-git-tree-sha1 = "6bdd46c1c6865b9e8bffaf654e24a9ec012cebc8"
+git-tree-sha1 = "ccc2352622a48006b206901b0dafc8b0764607f8"
 uuid = "b46f11dc-f210-4604-bfba-323c1ec968cb"
-version = "0.17.4"
+version = "0.18.9"
 
 [[deps.CoordinateTransformations]]
 deps = ["LinearAlgebra", "StaticArrays"]

@@ -8,6 +8,7 @@
 /plots/*
 /notebooks/*
 /_research
+/papers/figures/*
 
 ################################################################################
 #                          specific to this project                            #

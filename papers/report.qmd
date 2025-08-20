@@ -1,11 +1,495 @@
 ---
-title: "Ensemble atmospheric dispersion modeling of a near-range selenium-75 emission"
+title: "Ensemble atmospheric dispersion modelling of a near-range selenium-75 emission"
 format:
   html:
     code-fold: true
+  # pdf:
+    # keep-tex: true
 engine: julia
+julia:
+  exeflags: ["--project=../", "--quiet", "--depwarn=no", "--warn-overwrite=no"]
+execute:
+  echo: false
+  cache: false
 ---
 
 ```{julia}
-1 + 2
+using DrWatson
+@quickactivate
+include(srcdir("projections.jl"))
+include(srcdir("recipes.jl"))
+include(srcdir("outputs.jl"))
+include(srcdir("read_datasheet.jl"))
+include(srcdir("process_doserates.jl"))
+include(srcdir("plots.jl"))
+using Dates
+using TimeZones
+using Bijections
+using Markdown
+# using Plots
+# using Plots.PlotMeasures
+using CairoMakie
+using Unitful
+using Sckcen
+using Statistics
+using DataFramesMeta
+using Rasters
+import NCDatasets, Proj
+import CoordRefSystems as CRS
+using Printf
+using IntervalSets;
 ```
+
+```{julia}
+# | echo: false
+# Setting up some variables
+map_name = "sckcen.tif"
+element_id = :Se75
+
+fp_deter_simname = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0";
+```
+
+```{julia}
+# | echo: false
+# Load and pre process the observations data
+sensors_dose_rates = read_dose_rate_sensors();
+names_and_locations = select(unique(sensors_dose_rates, :longName), :longName, :lat, :lon);
+sensors_dose_rates = remove_background(sensors_dose_rates);
+obs_df = rename(sensors_dose_rates, :longName => :receptorName, :stop => :time, :value => :H10)
+obs_df[!, "simtype"] .= "obs";
+```
+
+```{julia}
+# | echo: false
+# Load and postprocess the flexpart deterministic results
+fp_deter_stack = RasterStack(string(first(get_outputs(fp_deter_simname))))
+relpoint = (; zip((:lon, :lat), Tuple(Float64.([fp_deter_stack[:RELLNG1][1], fp_deter_stack[:RELLAT1][1]])))...)
+fp_deter_conc = read(fp_deter_stack[:spec001_mr])
+replace!(fp_deter_conc, NaN => 0.)
+fp_deter_conc_allreleases_h = convert_to_bq(sum(fp_deter_conc, dims = :pointspec)[pointspec = 1])
+conc_allreleases = mean(fp_deter_conc_allreleases_h, dims = :height)
+fp_deter_conc_ts = conc_allreleases[nageclass = 1, height = 1];
+```
+
+```{julia}
+# | echo: false
+# Load and pre process the simulated dose rate datasets
+flexpart_dirmap = Dict(
+    "ENFO_BE_20190513T00_res=0.0001_timestep=10_we=1000.0" => astimezone(ZonedDateTime(2019,5,13,00,00,00, tz"UTC"), tz"Europe/Brussels"),
+    "ENFO_BE_20190513T12_res=0.0001_timestep=10_we=1000.0" => astimezone(ZonedDateTime(2019,5,13,12,00,00, tz"UTC"), tz"Europe/Brussels"),
+    "ENFO_BE_20190514T00_res=0.0001_timestep=10_we=1000.0" => astimezone(ZonedDateTime(2019,5,14,00,00,00, tz"UTC"), tz"Europe/Brussels"),
+    "ENFO_BE_20190514T12_res=0.0001_timestep=10_we=1000.0" => astimezone(ZonedDateTime(2019,5,14,12,00,00, tz"UTC"), tz"Europe/Brussels"),
+    "ENFO_BE_20190515T00_res=0.0001_timestep=10_we=1000.0" => astimezone(ZonedDateTime(2019,5,15,00,00,00, tz"UTC"), tz"Europe/Brussels"),
+) |> Bijection
+
+flexpart_deter_sim = "FirstPuff_OPER_res=0.0001_timestep=10_we=1000.0"
+
+gauss_deter_simname = "OPER_PG"
+
+gauss_ens_simname = "OPER_PG_ENS"
+
+filtered_sensors = [
+    "IMR/M03", 
+    "IMR/M15",
+    "IMR/M04", 
+    "IMR/M02",
+];
+
+# Gaussian simulations
+gauss_ens_dose_da = load(dose_rate_savename(gauss_ens_simname))[DOSE_RATES_SAVENAME]
+gauss_ens_df = rename!(DataFrame(gauss_ens_dose_da), [:Ti, :sensor] .=> [:time, :receptorName])
+gauss_ens_df.simname .= get(ddmetadata(gauss_ens_dose_da), "simname", "")
+gauss_ens_df.simtype .= get(ddmetadata(gauss_ens_dose_da), "simtype", "")
+gauss_ens_df.isensemble .= get(ddmetadata(gauss_ens_dose_da), "ensemble", false)
+gauss_deter_dose_da = dose_rates_to_df(gauss_deter_simname);
+
+# Flexpart simulations
+flexpart_ens_dose_df = aggregate_sims(flexpart_dirmap)
+flexpart_ens_dose_df = rename(flexpart_ens_dose_df, :forecast_start => :fcstart)
+flexpart_deter_dose_df = dose_rates_to_df(flexpart_deter_sim)
+
+# Make a tidy dataframe and select the relevant time interval
+df = vcat(flexpart_deter_dose_df, flexpart_ens_dose_df, gauss_deter_dose_da, gauss_ens_df, obs_df, cols = :union)
+df = @rsubset df :time >= DateTime("2019-05-15T15:20:00") && :time <= DateTime("2019-05-15T16:10:00")
+
+flexpart_deter = @rsubset df (:simtype == "flexpart" && :isensemble == false)
+flexpart_ens = @rsubset df (:simtype == "flexpart" && :isensemble == true)
+gauss_deter = @rsubset df (:simtype == "gaussian" && :isensemble == false)
+gauss_ens = @rsubset df (:simtype == "gaussian" && :isensemble == true)
+obs = @rsubset df :simtype == "obs"
+
+# Compute the statistical results
+ens_stats_by_sim_df = @chain begin df
+    @rsubset _ :isensemble == true
+    @rsubset _ :receptorName in filtered_sensors
+    combine(groupby(_, [:time, :receptorName, :fcstart, :simtype]), :H10 => mean, :H10 => std)
+end
+ens_stats_full_df = @chain begin df
+    @rsubset _ :isensemble == true
+    @rsubset _ :receptorName in filtered_sensors
+    combine(groupby(_, [:time, :receptorName]), :H10 => mean, :H10 => std)
+end;
+```
+# Introduction
+
+On May 15th, 2019, an incident in a hot cell at the Belgian Reactor 2 (BR2) on the SCK CEN campus in Mol led to the accidental release of radioactive selenium-75 (Se-75) into the atmosphere via the facility’s ventilation stack. The release originated from a Se-75 capsule under production, with an initial puff discharging approximately 1.49 10\^10 Bq of Se-75, followed by residual emissions at orders-of-magnitude lower levels over subsequent months.
+
+Two releases stages could be identified: the initial puff and the residual release. The initial puff was detected by the TELERAD network — a nationwide radiological surveillance and early-warning system comprising gamma dose rate sensors. The residual release was composed by trace Se-75 concentrations, which were later identified on aerosol filters in northwestern France by the Institute for Radiological Protection and Nuclear Safety.
+
+Previous investigations by Frankemölle et al. (2022) and De Meutter and Hoffman (2020) examined both the source term reconstruction and local-scale dispersion of Se-75, employing atmospheric dispersion models to analyze both the initial puff and residual release. Frankemölle et al. (2022) specifically conducted Gaussian plume simulations using on-site meteorological data and validated their results by comparing modeled ambient dose equivalent rates with observations from Belgium's TELERAD monitoring network (Note: While simulations were performed for both release stages, the current study focuses exclusively on the initial puff). These comparisons demonstrated that the simulations provide a consistent representation of Se-75's near-range dispersion patterns.
+
+This previous work demonstrated the effectiveness of Gaussian dispersion models in simulating local-scale transport for well-characterized releases. However, when using dispersion models to predict hazardous material concentrations near release sites, it is equally important to quantify the associated prediction uncertainties. Ensemble Dispersion Modeling (EDM) addresses this need by running multiple dispersion simulations (ensemble members) and analyzing their statistical distribution, providing a probabilistic perspective on potential dispersion patterns (Galmarini et al., 2004). Among the various EDM methodologies available, this study specifically examines two key approaches: (1) a multi-model ensemble technique and (2) the use of ensemble meteorological fields as input to the dispersion model.
+
+A key challenge in uncertainty quantification is ensemble under-dispersion (or overconfidence), where the ensemble members fail to capture the full range of uncertainties inherent to the predictions. This issue is particularly pronounced at short spatial scales, where perturbations in initial conditions have limited time to develop. While various techniques exist to enhance ensemble spread — some involving complex mathematical formulations that increase model complexity — this study explores two straightforward approaches: (1) incorporating earlier ensemble forecast initializations into the meteorological inputs, and (2) examining how a multi-model strategy affects dispersion uncertainty. These methods provide practical alternatives to more computationally intensive solutions while effectively addressing under-dispersion.
+
+# Methodology
+
+This study employs two complementary dispersion modeling approaches: the Lagrangian particle model FLEXPART (Pisso et al., 2019) and a Gaussian plume formulation. FLEXPART simulates atmospheric transport through stochastic tracking of fictitious particles, incorporating processes of advection, convection, and deposition driven by ECMWF meteorological inputs. The Gaussian plume implementation was developed using the GaussianDispersion.jl Julia package, employing standard Pasquill-Gifford stability classifications with Briggs dispersion coefficients. Both models were forced with consistent wind fields interpolated from the same ECMWF datasets, ensuring comparable boundary conditions for model intercomparison.
+
+An array of gamma dose rate detectors monitors the vicinity of the BR2 facility. @fig-map shows their geographical distribution alongside the time-integrated concentration (TIC) field from our deterministic FLEXPART simulation. These detectors provide 10-min-average measurements of the ambient dose equivalent rate $\dot{H}^*(10)$ (Sv/s). To enable direct comparison with the dispersion model outputs, we converted simulated concentration fields to dose rates using the Healy and Baker (1968) formulation for air kerma rate calculation, subsequently applying the ICRP 74 (ICRP, 1996) conversion coefficients to obtain ambient dose equivalent rates. This methodology follows the approach detailed in Frankemölle et al. (2022).
+
+```{julia}
+#| label: fig-map
+#| fig-cap: "Time Integrated Concentration (TIC) [Bq s/m³] of the FLEXPART deterministic simulation in the vicinity of the release, with the locations of the gamma dose rate detectors and the BR2 facility. The spatial unit is in meter."
+
+# Plot the TIC map with the sensor locations
+Δtime = intervals(dims(fp_deter_conc_ts, Ti)[1]:Minute(10):dims(fp_deter_conc_ts, Ti)[end-1])
+timesteps = Second.([x[2] - x[1] for x in IntervalSets.endpoints.(Δtime)])
+diffconc = (Array(fp_deter_conc_ts)[:,:,2:end] .+ Array(fp_deter_conc_ts)[:,:,1:end-1]) / 2
+TIC = sum(cat([eachslice(diffconc, dims = 3)[k] .* Dates.value(timesteps[k]) for k in 1:length(timesteps)]..., dims=3), dims=3)[:,:,1]
+TIC_da = DimArray(TIC, (dims(fp_deter_conc_ts, X), dims(fp_deter_conc_ts, Y)))
+lambert_TIC = Rasters.resample(Rasters.setcrs(Rasters.Raster(TIC_da), EPSG(4326)), crs=EPSG(31370));
+lambert_TIC = replace(Rasters.trim(replace(lambert_TIC, 0. => nothing)), nothing => 0.)
+lambert_TIC = replace(lambert_TIC, missing => 0.0)
+
+latlon_to_BD72 = Proj.Transformation("EPSG:4326", "EPSG:31370")
+raw_map = load_map(map_name);
+rgb_map = map2rgb(raw_map);
+lambert_fp_deter_conc_ts = Rasters.resample(Rasters.setcrs(fp_deter_conc_ts, EPSG(4326)), crs=EPSG(31370));
+lambert_fp_deter_conc_ts = replace(Rasters.trim(replace(lambert_fp_deter_conc_ts, 0. => nothing)), nothing => 0.)
+lambert_fp_deter_conc_ts = replace(lambert_fp_deter_conc_ts, missing => 0.0)
+xc, yc = get_center(rgb_map)
+lambert_fp_deter_conc_ts_shifted = set(lambert_fp_deter_conc_ts, X => dims(lambert_fp_deter_conc_ts, X) .- xc, Y => dims(lambert_fp_deter_conc_ts, Y) .- yc)
+rgb_map_shifted = set(rgb_map, X => dims(rgb_map, X) .- xc, Y => dims(rgb_map, Y) .- yc)
+relpoint_lamber = latlon_to_BD72(relpoint.lat, relpoint.lon) .- (xc, yc)
+coords_lambert = [latlon_to_BD72(lat, lon) .- (xc, yc) for (lat, lon) in zip(names_and_locations.lat, names_and_locations.lon)]
+sensors_lambert = hcat(names_and_locations, DataFrame(coords_lambert, [:x, :y]))
+sensors_lambert = transform(sensors_lambert, :longName => ByRow(x -> split(x, "/")[2]) => :shortName)
+
+relpoint_lamber = latlon_to_BD72(relpoint.lat, relpoint.lon) .- (xc, yc)
+
+f = Figure()
+lambert_TIC_log = replace(log10.(lambert_TIC), -Inf => NaN)
+
+xticks = (-1000:200:1000).+ xc
+yticks = (-1000:200:1000).+ yc
+xlims = (-450, 400) .+ xc
+ylims = (-500, 400) .+ yc
+ax = Axis(f[1, 1];
+    limits = (xlims..., ylims...),
+    aspect = DataAspect(),
+    xticks = xticks,
+    yticks = yticks,
+    xtickformat = xs -> [@sprintf("%d", x - xc) for x in xs],
+    ytickformat = ys -> [@sprintf("%d", y - yc) for y in ys],
+)
+
+# hidedecorations!(ax)
+Makie.plot!(ax, rgb_map)
+
+Makie.contourf!(ax, lambert_TIC_log, 
+    colormap=cgrad(:viridis; scale = log10, alpha = 0.6),
+)
+
+for sensor in eachrow(sensors_lambert)
+    x, y, text, color, fontsize, offset = sensor.x + xc, sensor.y + yc, sensor.shortName, :white, 14, (0,-25)
+    p = Point2f(x, y)
+    Makie.scatter!(ax, p;
+        markersize = 15,
+        color = :red,
+        overdraw = true,
+        marker = :star4
+    )
+    Makie.text!(ax, p;
+        text = text,
+        color,
+        fontsize,
+        offset,
+        align = (:center, :bottom),
+        overdraw = true,
+        glowwidth = 10.,
+        glowcolor = :red,
+        strokewidth = 20,
+    )
+end
+
+prel = Point2f(relpoint_lamber[1] + xc, relpoint_lamber[2] + yc)
+Makie.scatter!(ax, prel;
+    markersize = 15,
+    color = :green,
+    marker = :pentagon,
+    strokecolor = :black,
+    strokewidth = 2,
+    overdraw = true,
+)
+
+Makie.text!(ax, prel;
+    text = "BR2",
+    color = :white,
+    fontsize = 15,
+    offset = (0,25),
+    align = (:center, :top),
+    overdraw = true,
+    glowwidth = 10.,
+    glowcolor = :red,
+    strokewidth = 0.2,
+    strokecolor = :black,
+    font = :bold
+)
+
+cbar = Colorbar(f[1, 2], plots(ax)[2], 
+    label = "TIC",
+    vertical = true,
+)
+_formatcbar = xs -> [L"10^{%$(Int(round(x, sigdigits = 1)))}" for x in xs]
+cbar.tickformat = _formatcbar
+
+save("figures/fig-map.png", f)
+
+f
+```
+
+The dispersion models were driven by meteorological inputs from ECMWF's operational archive, including both deterministic forecasts and Ensemble Prediction System (EPS) data. The EPS comprises 50 ensemble members available at 3-hourly intervals, each serving as input for separate dispersion simulations with both models. To enhance the ensemble size, we incorporated five additional forecasts initialized at 12-hour intervals prior to the first initialization time (2019-05-15 at 00:00, 2019-05-14 at 12:00, 2019-05-14 at 00:00, 2019-05-13 at 12:00, and 2019-05-13 at 00:00). This approach expanded the total number of dispersion ensemble members to 250 per model. From this comprehensive ensemble, we derived key statistical metrics including the ensemble mean and spread (quantified as the standard deviation from the mean).
+
+# Results
+<!-- while it showed a spurious background fluctuations after the peak, it was suggested that the peak could still be attributed to the puff (see Section 3.3.2 of Frankemölle et al. (2022) for more details) -->
+@fig-ensemble presents the ensemble dispersion simulation results, focusing on TELERAD stations IMR/M03, IMR/M04, and IMR/M15 where measurements exceeded the statistical detection threshold. While IMR/M02 did not meet this threshold, it was included as its signal reveals noteworthy features (discussed subsequently). The results demonstrate consistently greater ensemble spread in the Gaussian plume model compared to FLEXPART, indicating higher sensitivity to meteorological variations with this parameterization. Notably, the highest uncertainty occurs at IMR/M02 - a station initially excluded from formal analysis due to statistically insignificant signals, yet whose measurements show partial temporal alignment with the simulated plume passage (see Section 3.3.2 of Frankemölle et al. (2022) for more details). We can also see that the measurements often falls outside of the standard deviation zone, which means a somewhat under-dispersiveness of the ensemble, even for the most dispersive ensemble.
+
+```{julia}
+#| label: fig-ensemble
+#| fig-cap: "Comparison of background-subtracted ambient dose equivalent rates (in nSV/hour) between TELERAD measurements and ensemble simulations. Black solid lines represent TELERAD measurements, while dashed lines show deterministic simulation results. Ensemble means are depicted as solid colored lines (blue: FLEXPART; orange: Gaussian plume; green: combined ensemble), with shaded bands indicating the ensemble spread (±1 standard deviation)."
+
+# Plot the comparison with ensemble
+yunit = unit(flexpart_ens.H10[1])
+
+f = Figure(; size = (1200, 650))
+ga = f[1,1] = GridLayout()
+alltimes = unique(flexpart_ens.time)
+itimes = 1:length(alltimes) 
+# axs = [Axis(ga[row, col]) for (row, col) in ax_indices]
+axs_fp = [Axis(ga[1, i]) for i in 1:length(filtered_sensors)]
+axs_gs = [Axis(ga[2, i]) for i in 1:length(filtered_sensors)]
+axs_all = [Axis(ga[3, i]) for i in 1:length(filtered_sensors)]
+
+COLORS = Makie.wong_colors()
+I_AX_LEGEND = 3
+OBS_LABEL = "TELERAD"
+YLABEL = L"\dot{H}^*(10)"
+# YLABEL = L"\dot{H}^*(10) \text{[%$yunit]}"
+ylim = (-1, 7)
+for (i, receptor) in enumerate(filtered_sensors)
+    ax_fp = axs_fp[i]
+    ax_fp.title = receptor
+    ax_fp.xticks = (itimes, Dates.format.(Time.(alltimes), "HH:MM"))
+
+    obs_inreceptor = @rsubset obs :receptorName == receptor
+
+    ylims!(ax_fp, ylim...)
+
+    scatterlines!(ax_fp, 1:nrow(obs_inreceptor), ustrip.(obs_inreceptor.H10); label=OBS_LABEL, markersize = 3, color = :black)
+    scatterlines!(ax_fp, itimes, ustrip.((@rsubset flexpart_deter :receptorName == receptor).H10); color = COLORS[1], linestyle = :dash, label = "flexpart deter")
+    plot_spread!(ax_fp, @rsubset flexpart_ens :receptorName == receptor; color = COLORS[1], label = "flexpart ens")
+
+    ax_gs = axs_gs[i]
+    ax_gs.xticks = (itimes, Dates.format.(Time.(alltimes), "HH:MM"))
+    ax_gs.xticklabelrotation = deg2rad(10)
+    ylims!(ax_gs, ylim...)
+
+    scatterlines!(ax_gs, 1:nrow(obs_inreceptor), ustrip.(obs_inreceptor.H10); label=OBS_LABEL, markersize = 3, color = :black)
+    scatterlines!(ax_gs, itimes, ustrip.((@rsubset gauss_deter :receptorName == receptor).H10); color =  COLORS[2], linestyle = :dash, label = "gaussian deter")
+    plot_spread!(ax_gs, @rsubset gauss_ens :receptorName == receptor; color =  COLORS[2], label = "gaussian ens")
+
+    ax_all = axs_all[i]
+    ax_all.xticks = (itimes, Dates.format.(Time.(alltimes), "HH:MM"))
+    ax_all.xticklabelrotation = deg2rad(10)
+    ylims!(ax_all, ylim...)
+
+
+    scatterlines!(ax_all, 1:nrow(obs_inreceptor), ustrip.(obs_inreceptor.H10); label=OBS_LABEL, markersize = 3, color = :black)
+    scatterlines!(ax_all, itimes, ustrip.((@rsubset flexpart_deter :receptorName == receptor).H10); color = COLORS[1], linestyle = :dash, label = "flexpart deter")
+    scatterlines!(ax_all, itimes, ustrip.((@rsubset gauss_deter :receptorName == receptor).H10); color =  COLORS[2], linestyle = :dash, label = "gaussian deter")
+
+    full_mean = (@rsubset ens_stats_full_df :receptorName == receptor)[!, :H10_mean] |> ustrip
+    full_std = (@rsubset ens_stats_full_df :receptorName == receptor)[!, :H10_std] |> ustrip
+    scatterlines!(ax_all, itimes, full_mean; color = COLORS[3], label="all members")
+    band!(ax_all, itimes, full_mean .- full_std, full_mean .+ full_std; color = (COLORS[3], 0.2))
+    # scatterlines!(ax_all, itimes, ustrip.((@rsubset flexpart_oper :receptorName == receptor).H10); color = :red, label = "flexpart deter")
+
+    if i == I_AX_LEGEND
+        axislegend(ax_fp)
+        axislegend(ax_gs)
+        axislegend(ax_all)
+    end
+    if i == 1
+        # axislegend(ax_all)
+        ax_fp.ylabel = YLABEL
+        ax_gs.ylabel = YLABEL
+        ax_all.ylabel = YLABEL
+    else
+        hideydecorations!(ax_fp, grid=false)
+        hideydecorations!(ax_gs, grid=false)
+        hideydecorations!(ax_all, grid=false)
+    end
+    hidexdecorations!(ax_fp, grid=false)
+    hidexdecorations!(ax_gs, grid=false)
+end
+colgap!(ga, 0)
+rowgap!(ga, 20)
+
+save("figures/fig-ensemble.png", f)
+
+f
+```
+
+```{julia}
+# | label: fig-spread
+# | fig-cap: "Temporal and spatial average of ensemble spread across all valid detection stations, showing the impact of progressively incorporating earlier forecast initializations (from 0 to 48 hours prior to the first initialization at 2019-05-15 00:00)."
+
+# Plot the evolution of the spread with the initialization time
+function stats_by_fcstart(curdf)
+    fcstarts = [
+        ZonedDateTime("2019-05-15T02:00:00+02:00"),
+        ZonedDateTime("2019-05-14T14:00:00+02:00"),
+        ZonedDateTime("2019-05-14T02:00:00+02:00"),
+        ZonedDateTime("2019-05-13T14:00:00+02:00"),
+        ZonedDateTime("2019-05-13T02:00:00+02:00"),
+    ]
+    fcstart_stats = []
+    for (i, fcstart) in enumerate(fcstarts)
+        lastn_fcstart = @rsubset curdf :fcstart >= fcstart
+        stats = combine(groupby(lastn_fcstart, [:time, :receptorName]), :H10 => mean, :H10 => std)
+        stats[!, :n_forecasts] .= i
+        push!(fcstart_stats, stats)
+    end
+    vcat(fcstart_stats...; cols=:union)
+end
+
+fpstats = @rsubset stats_by_fcstart(@rsubset df :simtype == "flexpart" && :isensemble == true) :receptorName in filtered_sensors
+gsstats = @rsubset stats_by_fcstart(@rsubset df :simtype == "gaussian" && :isensemble == true) :receptorName in filtered_sensors
+allstats = @rsubset stats_by_fcstart(@rsubset df :isensemble == true) :receptorName in filtered_sensors
+
+fpstats_avg = combine(groupby(fpstats, [:n_forecasts]), :H10_std => mean => :spread_avg)
+gsstats_avg = combine(groupby(gsstats, [:n_forecasts]), :H10_std => mean => :spread_avg)
+allstats_avg = combine(groupby(allstats, [:n_forecasts]), :H10_std => mean => :spread_avg)
+
+f_spread_evol = Figure(; 
+)
+ax_spread_evol = Axis(f_spread_evol[1, 1],
+    # title = "Evolution of the spread average when adding forecast initializations.",
+    # ylabel = L"\sigma",
+    ylabel = "Average spread",
+    xlabel = "Number of initializations",
+    # xticks = (1:length(mean_and_median_spread.forecast_start), Dates.format.(mean_and_median_spread.forecast_start, "ddth of \\Ma\\y at HHh"))
+)
+
+scatterlines!(ax_spread_evol, fpstats_avg[!, :n_forecasts], fpstats_avg[!, :spread_avg] .|> ustrip, label="flexpart")
+scatterlines!(ax_spread_evol, gsstats_avg[!, :n_forecasts], gsstats_avg[!, :spread_avg] .|> ustrip, label="gaussian")
+scatterlines!(ax_spread_evol, allstats_avg[!, :n_forecasts], allstats_avg[!, :spread_avg] .|> ustrip, label="both")
+ylims!(ax_spread_evol, (0, 0.65))
+axislegend(ax_spread_evol, position=:rb)
+
+save("figures/fig-spread.png", f_spread_evol)
+
+f_spread_evol
+```
+
+To assess how forecast initialization times affect ensemble uncertainty, we computed the time- and station-averaged ensemble spread (@fig-spread). The results demonstrate a systematic increase in spread with each additional forecast initialization, culminating in a 42% enhancement for the full ensemble compared to using only the most recent forecast. Interestingly, individual model ensembles (FLEXPART or Gaussian plume alone) sometimes exhibit greater spread than the combined ensemble. This occurs because FLEXPART frequently produces tighter concentration distributions (lower spread) while maintaining similar ensemble means to the Gaussian plume model, thereby reducing the overall variability in the full ensemble.
+
+```{julia}
+#| echo: false
+spread_increase = (allstats_avg.spread_avg[end] / allstats_avg.spread_avg[1] - 1) * 100
+sspread_increase = @sprintf "%d" spread_increase
+# md"For the full ensemble, the spread is a increased by $(sspread_increase)%"
+sspread_increase == "42" || error("The percentage must be updated")
+```
+
+```{julia}
+#| label: fig-boxplot
+#| fig-cap: ""
+
+# Boxplot of the full ensemble
+yunit = unit(flexpart_ens.H10[1])
+
+f = Figure(; 
+  size = (1200, 300)
+)
+ga = f[1,1] = GridLayout()
+alltimes = unique(flexpart_ens.time)
+itimes = 1:length(alltimes) 
+# axs = [Axis(ga[row, col]) for (row, col) in ax_indices]
+axs_all = [Axis(ga[1, i]) for i in 1:length(filtered_sensors)]
+
+COLORS = Makie.wong_colors()
+I_AX_LEGEND = 2
+OBS_LABEL = "TELERAD"
+ylim = (-1, 9)
+for (i, receptor) in enumerate(filtered_sensors)
+    obs_atreceptor = @rsubset obs :receptorName == receptor
+
+    ax_all = axs_all[i]
+    ax_all.xticks = (itimes, Dates.format.(Time.(alltimes), "HH:MM"))
+    ax_all.xticklabelrotation = deg2rad(10)
+    ylims!(ax_all, ylim...)
+
+    full_ens_at_recep = @rsubset df (:receptorName == receptor) && (:simtype !== "obs") && (:isensemble == true)
+    Makie.boxplot!(ax_all, [findfirst(y -> y == x, unique(full_ens_at_recep.time)) for x in full_ens_at_recep.time], ustrip.(full_ens_at_recep.H10);
+      color = COLORS[3],
+      markersize = 5,
+      label = "full ens",
+      width = 0.7,
+      whiskercolor = :darkgreen,
+      whiskerlinewidth = 2,
+      mediancolor = :darkgreen,
+      medianlinewidth = 2,
+    )
+    scatterlines!(ax_all, 1:nrow(obs_atreceptor), ustrip.(obs_atreceptor.H10); label=OBS_LABEL, markersize = 3, color = :black)
+    # scatterlines!(ax_all, itimes, ustrip.((@rsubset flexpart_deter :receptorName == receptor).H10); color = COLORS[1], linestyle = :dash, label = "flexpart deter")
+    # scatterlines!(ax_all, itimes, ustrip.((@rsubset gauss_deter :receptorName == receptor).H10); color =  COLORS[2], linestyle = :dash, label = "gaussian deter")
+
+    full_mean = (@rsubset ens_stats_full_df :receptorName == receptor)[!, :H10_mean] |> ustrip
+    full_std = (@rsubset ens_stats_full_df :receptorName == receptor)[!, :H10_std] |> ustrip
+    # scatterlines!(ax_all, itimes, full_mean; color = COLORS[3], label="all members")
+    # band!(ax_all, itimes, full_mean .- full_std, full_mean .+ full_std; color = (COLORS[3], 0.2))
+    # scatterlines!(ax_all, itimes, ustrip.((@rsubset flexpart_oper :receptorName == receptor).H10); color = :red, label = "flexpart deter")
+
+    if i == I_AX_LEGEND
+        axislegend(ax_all)
+    end
+    if i == 1
+        # axislegend(ax_all)
+        ax_all.ylabel = "H10 [$yunit]"
+    else
+        hideydecorations!(ax_all, grid=false)
+    end
+end
+colgap!(ga, 0)
+rowgap!(ga, 20)
+
+save("figures/fig-boxplot.png", f)
+
+f
+```
+
+# Conclusion
+This study examined the influence of multi-model and multi-forecast initializations on ensemble spread in short-range dispersion modelling. Results indicate that increasing the number of forecast initializations generally enhances ensemble spread, whereas the multi-model approach can reduce it—particularly when the participating models share similar ensemble means.
+
+In all cases, the ensembles analysed appeared under-dispersive. Further investigation could assess whether adding more forecast initialization members would lead to a greater spread. Ensemble skill was addressed only briefly and qualitatively in this work, as the limited dataset (24 cases) renders more robust quantitative assessments (e.g., rank histograms, bias, root-mean-square error) statistically unreliable. A more comprehensive evaluation of how multi-modeling and additional forecast initializations affect ensemble skill would require a substantially larger set of observations.
+
+# References
+
+-   De Meutter, P., Hoffman, I., 2020. Bayesian source reconstruction of an anomalous Selenium-75 release at a nuclear research institute. Journal of Environmental Radioactivity 218, 106225. https://doi.org/10.1016/j.jenvrad.2020.106225
+-   Frankemölle, J.P.K.W., J. Camps, P. De Meutter, et al. 2022. ‘Near-Range Atmospheric Dispersion of an Anomalous Selenium-75 Emission’. Journal of Environmental Radioactivity 255 (December): 107012. https://doi.org/10.1016/j.jenvrad.2022.107012.
+-   Galmarini, S., Bianconi, R., Klug, W., Mikkelsen, T., Addis, R., Andronopoulos, S., Astrup, P., Baklanov, A., Bartniki, J., Bartzis, J.C., Bellasio, R., Bompay, F., Buckley, R., Bouzom, M., Champion, H., D’Amours, R., Davakis, E., Eleveld, H., Geertsema, G.T., Glaab, H., Kollax, M., Ilvonen, M., Manning, A., Pechinger, U., Persson, C., Polreich, E., Potemski, S., Prodanova, M., Saltbones, J., Slaper, H., Sofiev, M.A., Syrakov, D., Sørensen, J.H., Auwera, L.V. der, Valkama, I., Zelazny, R., 2004. Ensemble dispersion forecasting—Part I: concept, approach and indicators. Atmospheric Environment 38, 4607–4617. https://doi.org/10.1016/j.atmosenv.2004.05.030
+-   Healy, J.W., Baker, R.E., 1968. RADIOACTIVE CLOUD-DOSE CALCULATIONS. (No. TID--24190, 4485695). https://doi.org/10.2172/4485695
+-   ICRP, 1996. Conversion Coefficients for use in Radiological Protection against External Radiation. ICRP Publication 74. Ann. ICRP 26 (3-4).
+-   Pisso, I., Sollum, E., Grythe, H., Kristiansen, N.I., Cassiani, M., Eckhardt, S., Arnold, D., Morton, D., Thompson, R.L., Groot Zwaaftink, C.D., Evangeliou, N., Sodemann, H., Haimberger, L., Henne, S., Brunner, D., Burkhart, J.F., Fouilloux, A., Brioude, J., Philipp, A., Seibert, P., Stohl, A., 2019. The Lagrangian particle dispersion model FLEXPART version 10.4. Geoscientific Model Development 12, 4955–4997. https://doi.org/10.5194/gmd-12-4955-2019
