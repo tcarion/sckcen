@@ -67,6 +67,9 @@ end
 
 valid_time(input::InputArrays) = first(input.ds["valid_time"][:])
 time_bounds(bound::BoundingInputs) = (valid_time(bound.t1), valid_time(bound.t2))
+lead_time(filepath::String) = parse(Int, split(basename(filepath), ".")[3])
+lead_time(inp::InputArrays) = lead_time(inp.ds.index.grib_path)
+lead_times(bounds::BoundingInputs) = (lead_time(bounds.t1), lead_time(bounds.t2))
 
 function linear_interp(bound::BoundingInputs, var::Symbol, time; coords = (RELLON, RELLAT, RELHEIGHT))
     t1, t2 = time_bounds(bound)
@@ -93,6 +96,7 @@ process_wind(meteo::NamedTuple) = process_wind(meteo.u, meteo.v)
 function extract_meteo_ecmwf(inputdir::String, times::Vector{<:DateTime}; member = nothing)
     bounding_inputs = BoundingInputs(inputdir, first(times); member)
     t1, t2 = time_bounds(bounding_inputs)
+    lt1, lt2 = lead_times(bounding_inputs)
     res = []
     for time in times
         if time >= t2
@@ -104,7 +108,7 @@ function extract_meteo_ecmwf(inputdir::String, times::Vector{<:DateTime}; member
         v = linear_interp(bounding_inputs, :v, time)
         t = linear_interp(bounding_inputs, :t, time)
 
-        push!(res, (; u, v, t))
+        push!(res, (; u, v, t, t1, t2, lt1, lt2))
     end
     return res
 end

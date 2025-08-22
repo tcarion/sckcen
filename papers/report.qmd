@@ -130,6 +130,19 @@ ens_stats_full_df = @chain begin df
     combine(groupby(_, [:time, :receptorName]), :H10 => mean, :H10 => std)
 end;
 ```
+
+```{julia}
+# | echo: false
+# Load and pre process the meteo data
+
+meteo_df = DataFrame(load(datadir("meteo_ensemble.csv")))
+meteo_df[!, :fcstart] = ZonedDateTime.(meteo_df[!, :fcstart])
+meteo_df[!, :fc_label] = ["-$(Dates.Hour(maximum(meteo_df.fcstart) - x))" for x in meteo_df.fcstart]
+rename!(meteo_df, Dict(:Ti => "time"))
+meteo_df[!, :speed] = sqrt.(meteo_df.u.^2 + meteo_df.v.^2)
+meteo_df = sort(meteo_df, :fcstart);
+```
+
 # Introduction
 
 On May 15th, 2019, an incident in a hot cell at the Belgian Reactor 2 (BR2) on the SCK CEN campus in Mol led to the accidental release of radioactive selenium-75 (Se-75) into the atmosphere via the facility’s ventilation stack. The release originated from a Se-75 capsule under production, with an initial puff discharging approximately 1.49 10\^10 Bq of Se-75, followed by residual emissions at orders-of-magnitude lower levels over subsequent months.
@@ -355,8 +368,8 @@ f
 # | label: fig-spread
 # | fig-cap: "Temporal and spatial average of ensemble spread across all valid detection stations, showing the impact of progressively incorporating earlier forecast initializations (from 0 to 48 hours prior to the first initialization at 2019-05-15 00:00)."
 
-# Plot the evolution of the spread with the initialization time
-function stats_by_fcstart(curdf)
+# Plot the evolution of the spread with the number of initialization time
+function calc_avg_spread_accu(curdf)
     fcstarts = [
         ZonedDateTime("2019-05-15T02:00:00+02:00"),
         ZonedDateTime("2019-05-14T14:00:00+02:00"),
@@ -371,34 +384,73 @@ function stats_by_fcstart(curdf)
         stats[!, :n_forecasts] .= i
         push!(fcstart_stats, stats)
     end
-    vcat(fcstart_stats...; cols=:union)
+    accu = vcat(fcstart_stats...; cols=:union)
+    outdf = combine(groupby(accu, [:n_forecasts]), :H10_std => mean => :H10_std_avg)
+    print(outdf)
+    sort(outdf, :n_forecasts)
 end
 
-fpstats = @rsubset stats_by_fcstart(@rsubset df :simtype == "flexpart" && :isensemble == true) :receptorName in filtered_sensors
-gsstats = @rsubset stats_by_fcstart(@rsubset df :simtype == "gaussian" && :isensemble == true) :receptorName in filtered_sensors
-allstats = @rsubset stats_by_fcstart(@rsubset df :isensemble == true) :receptorName in filtered_sensors
+function calc_avg_spread(df)
+    outdf = @chain df begin
+        combine(groupby(_, [:time, :receptorName, :fcstart]), :H10 => mean, :H10 => std)
+        combine(groupby(_, [:fcstart]), :H10_std => mean => :H10_std_avg)
+    end
+    outdf[!, :fc_label] = ["-$(Dates.Hour(maximum(outdf.fcstart) - x))" for x in outdf.fcstart]
+    sort(outdf, :fcstart)
+end
 
-fpstats_avg = combine(groupby(fpstats, [:n_forecasts]), :H10_std => mean => :spread_avg)
-gsstats_avg = combine(groupby(gsstats, [:n_forecasts]), :H10_std => mean => :spread_avg)
-allstats_avg = combine(groupby(allstats, [:n_forecasts]), :H10_std => mean => :spread_avg)
+fp_df = @rsubset df :simtype == "flexpart" && :isensemble == true && :receptorName in filtered_sensors
+gs_df = @rsubset df :simtype == "gaussian" && :isensemble == true && :receptorName in filtered_sensors
+al_df = @rsubset df :receptorName in filtered_sensors && :isensemble == true
+
+fp_df_avg = calc_avg_spread(fp_df)
+gs_df_avg = calc_avg_spread(gs_df)
+al_df_avg = calc_avg_spread(al_df)
+
+fp_df_avg_acc = calc_avg_spread_accu(fp_df)
+gs_df_avg_acc = calc_avg_spread_accu(gs_df)
+al_df_avg_acc = calc_avg_spread_accu(al_df)
+
+# In reality, the wind data have been linearly interpolated along the time dimension. For the sake of simplicity, we consider the left bound of the time window (which is the closest the interpolated point for the considered time steps)
+meteo_ens_stats = combine(groupby(meteo_df, [:time, :fc_label, :leadtime1]),
+    :speed => mean => :speed_mean, 
+    :speed => std => :speed_std,
+)
+meteo_avg_ens = combine(groupby(meteo_ens_stats, [:fc_label, :leadtime1]), :speed_std => mean => :speed_std_avg)
 
 f_spread_evol = Figure(; 
 )
-ax_spread_evol = Axis(f_spread_evol[1, 1],
-    # title = "Evolution of the spread average when adding forecast initializations.",
+
+COLORS = Makie.wong_colors()
+npoints = length(fp_df_avg.fc_label)
+
+ax = Axis(f_spread_evol[1,1],
+    # title = "Evolution of the spread average with the forecast start time for meteo.",
     # ylabel = L"\sigma",
-    ylabel = "Average spread",
-    xlabel = "Number of initializations",
-    # xticks = (1:length(mean_and_median_spread.forecast_start), Dates.format.(mean_and_median_spread.forecast_start, "ddth of \\Ma\\y at HHh"))
+    ylabel = "average spread",
+    xlabel = "forecast lead time",
+    # xlabel = "forecast initialization",
+    xticklabelrotation = deg2rad(10),
+    # xticks = (1:npoints, meteo_avg_ens.fc_label),
+    xticks = (1:npoints, ["$lt hours" for lt in meteo_avg_ens.leadtime1]),
 )
 
-scatterlines!(ax_spread_evol, fpstats_avg[!, :n_forecasts], fpstats_avg[!, :spread_avg] .|> ustrip, label="flexpart")
-scatterlines!(ax_spread_evol, gsstats_avg[!, :n_forecasts], gsstats_avg[!, :spread_avg] .|> ustrip, label="gaussian")
-scatterlines!(ax_spread_evol, allstats_avg[!, :n_forecasts], allstats_avg[!, :spread_avg] .|> ustrip, label="both")
-ylims!(ax_spread_evol, (0, 0.65))
-axislegend(ax_spread_evol, position=:rb)
+scatterlines!(ax, reverse(1:npoints), reverse(fp_df_avg.H10_std_avg |> ustrip), label="flexpart", color=COLORS[1])
+scatterlines!(ax, reverse(1:npoints), fp_df_avg_acc.H10_std_avg |> ustrip, label="flexpart", color=COLORS[1], linestyle=:dash)
 
-save("figures/fig-spread.png", f_spread_evol)
+scatterlines!(ax, reverse(1:npoints), reverse(gs_df_avg.H10_std_avg |> ustrip), label="gaussian", color=COLORS[2])
+scatterlines!(ax, reverse(1:npoints), gs_df_avg_acc.H10_std_avg |> ustrip, label="gaussian", color=COLORS[2], linestyle=:dash)
+
+scatterlines!(ax, reverse(1:npoints), reverse(al_df_avg.H10_std_avg |> ustrip), label="all", color=COLORS[3])
+scatterlines!(ax, reverse(1:npoints), al_df_avg_acc.H10_std_avg |> ustrip, label="all", color=COLORS[3], linestyle=:dash)
+
+scatterlines!(ax, reverse(1:npoints), reverse(meteo_avg_ens.speed_std_avg), label="wind speed", color=COLORS[4])
+
+axislegend(ax, merge=true)
+
+
+Makie.ylims!(ax, (0, 0.8))
+# save("figures/fig-spread.png", f_spread_evol)
 
 f_spread_evol
 ```

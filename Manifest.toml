@@ -2,7 +2,7 @@
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "d4b6461de9db9b8b4d69acdb1685849c6f48d11b"
+project_hash = "7164ca9a8e40c763e2ff7506d38586a0693292ec"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -237,6 +237,12 @@ git-tree-sha1 = "deddd8725e5e1cc49ee205a1964256043720a6c3"
 uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 version = "0.10.15"
 
+[[deps.CSVFiles]]
+deps = ["CodecZlib", "DataValues", "FileIO", "HTTP", "IterableTables", "IteratorInterfaceExtensions", "TableShowUtils", "TableTraits", "TableTraitsUtils", "TextParse"]
+git-tree-sha1 = "2057fc0f258c2d67b31601d1a03319482a6f8b4c"
+uuid = "5d742f6a-9f54-50ce-8119-2520741973ca"
+version = "1.0.2"
+
 [[deps.Cairo]]
 deps = ["Cairo_jll", "Colors", "Glib_jll", "Graphics", "Libdl", "Pango_jll"]
 git-tree-sha1 = "71aa551c5c33f1a4415867fe06b7844faadb0ae9"
@@ -435,6 +441,12 @@ git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
 uuid = "e2d170a0-9d28-54be-80f0-106bbe20a464"
 version = "1.0.0"
 
+[[deps.DataValues]]
+deps = ["DataValueInterfaces", "Dates"]
+git-tree-sha1 = "d88a19299eba280a6d062e135a43f00323ae70bf"
+uuid = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
+version = "0.4.13"
+
 [[deps.Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -548,6 +560,12 @@ version = "0.25.119"
 git-tree-sha1 = "e7b7e6f178525d17c720ab9c081e4ef04429f860"
 uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 version = "0.9.4"
+
+[[deps.DoubleFloats]]
+deps = ["GenericLinearAlgebra", "LinearAlgebra", "Polynomials", "Printf", "Quadmath", "Random", "Requires", "SpecialFunctions"]
+git-tree-sha1 = "1ee9bc92a6b862a5ad556c52a3037249209bec1a"
+uuid = "497a8b3b-efae-58df-a0af-a86822472b78"
+version = "1.4.3"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
@@ -847,6 +865,12 @@ repo-url = "https://github.com/tcarion/GaussianDispersion.jl"
 uuid = "7b7cc4e3-398b-4c6b-b3a7-b5804ff909e2"
 version = "0.1.0"
 
+[[deps.GenericLinearAlgebra]]
+deps = ["LinearAlgebra", "Printf", "Random", "libblastrampoline_jll"]
+git-tree-sha1 = "37cef077b50d28b2542c1adb4c5427871a759d12"
+uuid = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
+version = "0.3.18"
+
 [[deps.GeoFormatTypes]]
 git-tree-sha1 = "8e233d5167e63d708d41f87597433f59a0f213fe"
 uuid = "68eda718-8dee-11e9-39e7-89f7f65f511f"
@@ -1140,6 +1164,12 @@ version = "0.1.1"
 git-tree-sha1 = "42d5f897009e7ff2cf88db414a389e5ed1bdd023"
 uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 version = "1.10.0"
+
+[[deps.IterableTables]]
+deps = ["DataValues", "IteratorInterfaceExtensions", "Requires", "TableTraits", "TableTraitsUtils"]
+git-tree-sha1 = "70300b876b2cebde43ebc0df42bc8c94a144e1b4"
+uuid = "1c8ee90f-4401-5389-894e-7a04a3dc0f4d"
+version = "1.0.0"
 
 [[deps.IteratorInterfaceExtensions]]
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
@@ -1538,6 +1568,11 @@ version = "1.1.1"
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
+[[deps.Nullables]]
+git-tree-sha1 = "8f87854cc8f3685a60689d8edecaa29d2251979b"
+uuid = "4d1e1d77-625e-5b40-9113-a560ec7a8ecd"
+version = "1.0.0"
+
 [[deps.Observables]]
 git-tree-sha1 = "7438a59546cf62428fc9d1bc94729146d37a7225"
 uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
@@ -1738,6 +1773,24 @@ git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
 uuid = "647866c9-e3ac-4575-94e7-e3d426903924"
 version = "0.1.2"
 
+[[deps.Polynomials]]
+deps = ["LinearAlgebra", "OrderedCollections", "RecipesBase", "Requires", "Setfield", "SparseArrays"]
+git-tree-sha1 = "2660ba4e0e9354cf0f3deeefb61531bbdac5495d"
+uuid = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+version = "4.0.21"
+
+    [deps.Polynomials.extensions]
+    PolynomialsChainRulesCoreExt = "ChainRulesCore"
+    PolynomialsFFTWExt = "FFTW"
+    PolynomialsMakieCoreExt = "MakieCore"
+    PolynomialsMutableArithmeticsExt = "MutableArithmetics"
+
+    [deps.Polynomials.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+    MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
+    MutableArithmetics = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
+
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
 git-tree-sha1 = "36d8b4b899628fb92c2749eb488d884a926614d3"
@@ -1837,6 +1890,12 @@ version = "2.11.2"
 
     [deps.QuadGK.weakdeps]
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
+[[deps.Quadmath]]
+deps = ["Compat", "Printf", "Random", "Requires"]
+git-tree-sha1 = "6bc924717c495f24de85867aa94da4de0e6cd1a1"
+uuid = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
+version = "0.5.13"
 
 [[deps.Quaternions]]
 deps = ["LinearAlgebra", "Random", "RealDot"]
@@ -2214,11 +2273,23 @@ git-tree-sha1 = "c0405d3f8189bb9a9755e429c6ea2138fca7e31f"
 uuid = "9ce81f87-eacc-4366-bf80-b621a3098ee2"
 version = "0.1.0"
 
+[[deps.TableShowUtils]]
+deps = ["DataValues", "Dates", "JSON", "Markdown", "Unicode"]
+git-tree-sha1 = "2a41a3dedda21ed1184a47caab56ed9304e9a038"
+uuid = "5e66a065-1f0a-5976-b372-e0b8c017ca10"
+version = "0.2.6"
+
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
 git-tree-sha1 = "c06b2f539df1c6efa794486abfb6ed2022561a39"
 uuid = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
 version = "1.0.1"
+
+[[deps.TableTraitsUtils]]
+deps = ["DataValues", "IteratorInterfaceExtensions", "Missings", "TableTraits"]
+git-tree-sha1 = "78fecfe140d7abb480b53a44f3f85b6aa373c293"
+uuid = "382cd787-c1b6-5bf2-a167-d5b971a19bda"
+version = "1.0.2"
 
 [[deps.Tables]]
 deps = ["DataAPI", "DataValueInterfaces", "IteratorInterfaceExtensions", "OrderedCollections", "TableTraits"]
@@ -2241,6 +2312,12 @@ version = "0.1.1"
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 version = "1.11.0"
+
+[[deps.TextParse]]
+deps = ["CodecZlib", "DataStructures", "Dates", "DoubleFloats", "Mmap", "Nullables", "WeakRefStrings"]
+git-tree-sha1 = "43eddc3c0d788ebfc8a72bde108825ac65e66b11"
+uuid = "e0df1984-e451-5cb5-8b61-797a481e67e3"
+version = "1.0.3"
 
 [[deps.ThreadPools]]
 deps = ["Printf", "RecipesBase", "Statistics"]
