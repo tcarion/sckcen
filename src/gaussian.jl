@@ -66,6 +66,7 @@ function run_puff(puff::GaussianPuff)
     @unpack speeds, azimuths, rates, h = puff
     timely_conc = map(zip(speeds, azimuths, rates)) do (wind_speed, wind_azimuth, Q)
         pg_class = pasquill_gifford(GD.Strong(), wind_speed) |> collect |> first
+        @show pg_class
         θ = 360. .+ 90. .- wind_azimuth
 
         gridrot = rotate_grid(grid_array, θ)
@@ -89,10 +90,10 @@ end
 function gaussian_puffs(puff::GaussianPuff, times)
 
     timely_conc = run_puff(puff)
-    return to_dimarray(timely_conc, puff.grid, times)
+    return to_dimarray(puff, timely_conc, puff.grid, times)
 end
 
-function to_dimarray(timely_conc, grid, times)
+function to_dimarray(puff, timely_conc, grid, times)
     TIC = reduce((x,y) -> x .+ y * Second(puff.steps[1]).value, timely_conc; init = zero(timely_conc[1]))
 
     ## Conversion to Dimensional Arrays

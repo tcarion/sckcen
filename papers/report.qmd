@@ -153,11 +153,11 @@ Previous investigations by Frankemölle et al. (2022) and De Meutter and Hoffman
 
 This previous work demonstrated the effectiveness of Gaussian dispersion models in simulating local-scale transport for well-characterized releases. However, when using dispersion models to predict hazardous material concentrations near release sites, it is equally important to quantify the associated prediction uncertainties. Ensemble Dispersion Modeling (EDM) addresses this need by running multiple dispersion simulations (ensemble members) and analyzing their statistical distribution, providing a probabilistic perspective on potential dispersion patterns (Galmarini et al., 2004). Among the various EDM methodologies available, this study specifically examines two key approaches: (1) a multi-model ensemble technique and (2) the use of ensemble meteorological fields as input to the dispersion model.
 
-A key challenge in uncertainty quantification is ensemble under-dispersion (or overconfidence), where the ensemble members fail to capture the full range of uncertainties inherent to the predictions. This issue is particularly pronounced at short spatial scales, where perturbations in initial conditions have limited time to develop. While various techniques exist to enhance ensemble spread — some involving complex mathematical formulations that increase model complexity — this study explores two straightforward approaches: (1) incorporating earlier ensemble forecast initializations into the meteorological inputs, and (2) examining how a multi-model strategy affects dispersion uncertainty. These methods provide practical alternatives to more computationally intensive solutions while effectively addressing under-dispersion.
+A key challenge in uncertainty quantification is ensemble under-dispersion (or overconfidence), where the ensemble members fail to capture the full range of uncertainties inherent to the predictions. This issue is particularly pronounced at short spatial scales, where perturbations in initial conditions have limited time to develop. While various techniques exist to enhance ensemble spread — some involving complex mathematical formulations that increase model complexity — this study explores two straightforward approaches: (1) incorporating earlier ensemble forecast initializations into the meteorological inputs (e.g. increasing the lead time of the forecast), and (2) examining how a multi-model strategy affects dispersion uncertainty. These methods provide practical alternatives to more computationally intensive solutions while effectively addressing under-dispersion.
 
 # Methodology
 
-This study employs two complementary dispersion modeling approaches: the Lagrangian particle model FLEXPART (Pisso et al., 2019) and a Gaussian plume formulation. FLEXPART simulates atmospheric transport through stochastic tracking of fictitious particles, incorporating processes of advection, convection, and deposition driven by ECMWF meteorological inputs. The Gaussian plume implementation was developed using the GaussianDispersion.jl Julia package, employing standard Pasquill-Gifford stability classifications with Briggs dispersion coefficients. Both models were forced with consistent wind fields interpolated from the same ECMWF datasets, ensuring comparable boundary conditions for model intercomparison.
+This study employs two complementary dispersion modelling approaches: the Lagrangian particle model FLEXPART (Pisso et al., 2019) and a Gaussian plume formulation. FLEXPART simulates atmospheric transport through stochastic tracking of fictitious particles, incorporating processes of advection, convection, and deposition driven by ECMWF meteorological inputs. The Gaussian plume implementation was developed using the GaussianDispersion.jl Julia package, employing standard Pasquill-Gifford stability classifications with Briggs dispersion coefficients. Both models were forced with consistent wind fields interpolated from the same ECMWF datasets, ensuring comparable boundary conditions for model intercomparison.
 
 An array of gamma dose rate detectors monitors the vicinity of the BR2 facility. @fig-map shows their geographical distribution alongside the time-integrated concentration (TIC) field from our deterministic FLEXPART simulation. These detectors provide 10-min-average measurements of the ambient dose equivalent rate $\dot{H}^*(10)$ (Sv/s). To enable direct comparison with the dispersion model outputs, we converted simulated concentration fields to dose rates using the Healy and Baker (1968) formulation for air kerma rate calculation, subsequently applying the ICRP 74 (ICRP, 1996) conversion coefficients to obtain ambient dose equivalent rates. This methodology follows the approach detailed in Frankemölle et al. (2022).
 
@@ -272,7 +272,7 @@ save("figures/fig-map.png", f)
 f
 ```
 
-The dispersion models were driven by meteorological inputs from ECMWF's operational archive, including both deterministic forecasts and Ensemble Prediction System (EPS) data. The EPS comprises 50 ensemble members available at 3-hourly intervals, each serving as input for separate dispersion simulations with both models. To enhance the ensemble size, we incorporated five additional forecasts initialized at 12-hour intervals prior to the first initialization time (2019-05-15 at 00:00, 2019-05-14 at 12:00, 2019-05-14 at 00:00, 2019-05-13 at 12:00, and 2019-05-13 at 00:00). This approach expanded the total number of dispersion ensemble members to 250 per model. From this comprehensive ensemble, we derived key statistical metrics including the ensemble mean and spread (quantified as the standard deviation from the mean).
+The dispersion models were driven by meteorological inputs from ECMWF's operational archive, including both deterministic forecasts and Ensemble Prediction System (EPS) data. The EPS comprises 50 ensemble members available at 3-hourly intervals, each serving as input for separate dispersion simulations with both models. To enhance the ensemble size, we incorporated five additional forecasts initialized at 12-hour intervals prior to the first initialization time (2019-05-15 at 00:00, 2019-05-14 at 12:00, 2019-05-14 at 00:00, 2019-05-13 at 12:00, and 2019-05-13 at 00:00). This approach expanded the total number of dispersion ensemble members to 250 per model. From this ensemble, we derived key statistical metrics including the ensemble mean, the ensemble spread (quantified as the standard deviation from the mean) and the coefficient of variation (defined as the ensemble standard deviation normalized by the mean).
 
 # Results
 <!-- while it showed a spurious background fluctuations after the peak, it was suggested that the peak could still be attributed to the puff (see Section 3.3.2 of Frankemölle et al. (2022) for more details) -->
@@ -309,18 +309,31 @@ for (i, receptor) in enumerate(filtered_sensors)
 
     ylims!(ax_fp, ylim...)
 
+    full_ens_fp = @rsubset df :receptorName == receptor && :simtype == "flexpart" && :isensemble == true
+    full_ens_fp_stats = combine(groupby(full_ens_fp, [:time]), :H10 => mean, :H10 => std)
+    curmean = full_ens_fp_stats.H10_mean |> ustrip
+    curspread = full_ens_fp_stats.H10_std |> ustrip
+
     scatterlines!(ax_fp, 1:nrow(obs_inreceptor), ustrip.(obs_inreceptor.H10); label=OBS_LABEL, markersize = 3, color = :black)
     scatterlines!(ax_fp, itimes, ustrip.((@rsubset flexpart_deter :receptorName == receptor).H10); color = COLORS[1], linestyle = :dash, label = "flexpart deter")
-    plot_spread!(ax_fp, @rsubset flexpart_ens :receptorName == receptor; color = COLORS[1], label = "flexpart ens")
+    scatterlines!(ax_fp, itimes, curmean; color = COLORS[1], label = "flexpart ens")
+    band!(ax_fp, itimes, curmean .- curspread, curmean .+ curspread; color = (COLORS[1], 0.2))
+    # plot_spread!(ax_fp, @rsubset flexpart_ens :receptorName == receptor; color = COLORS[1], label = "flexpart ens")
 
     ax_gs = axs_gs[i]
     ax_gs.xticks = (itimes, Dates.format.(Time.(alltimes), "HH:MM"))
     ax_gs.xticklabelrotation = deg2rad(10)
     ylims!(ax_gs, ylim...)
 
+    full_ens_gs = @rsubset df :receptorName == receptor && :simtype == "gaussian" && :isensemble == true
+    full_ens_gs_stats = combine(groupby(full_ens_gs, [:time]), :H10 => mean, :H10 => std)
+    curmean = full_ens_gs_stats.H10_mean |> ustrip
+    curspread = full_ens_gs_stats.H10_std |> ustrip
     scatterlines!(ax_gs, 1:nrow(obs_inreceptor), ustrip.(obs_inreceptor.H10); label=OBS_LABEL, markersize = 3, color = :black)
     scatterlines!(ax_gs, itimes, ustrip.((@rsubset gauss_deter :receptorName == receptor).H10); color =  COLORS[2], linestyle = :dash, label = "gaussian deter")
-    plot_spread!(ax_gs, @rsubset gauss_ens :receptorName == receptor; color =  COLORS[2], label = "gaussian ens")
+    scatterlines!(ax_gs, itimes, curmean; color = COLORS[2], label = "gaussian ens")
+    band!(ax_gs, itimes, curmean .- curspread, curmean .+ curspread; color = (COLORS[2], 0.2))
+    # plot_spread!(ax_gs, @rsubset gauss_ens :receptorName == receptor; color =  COLORS[2], label = "gaussian ens")
 
     ax_all = axs_all[i]
     ax_all.xticks = (itimes, Dates.format.(Time.(alltimes), "HH:MM"))
@@ -359,14 +372,14 @@ end
 colgap!(ga, 0)
 rowgap!(ga, 20)
 
-save("figures/fig-ensemble.png", f)
+# save("figures/fig-ensemble.png", f)
 
 f
 ```
 
 ```{julia}
 # | label: fig-spread
-# | fig-cap: "Temporal and spatial average of ensemble spread across all valid detection stations, showing the impact of progressively incorporating earlier forecast initializations (from 0 to 48 hours prior to the first initialization at 2019-05-15 00:00)."
+# | fig-cap: "Temporal and spatial average of the ensemble coefficient of variation across all valid detection stations as a function of forecast lead time. Solid lines represent values calculated from individual ensemble forecasts (e.g., a single initialization time), while dashed lines show results from progressively accumulated ensemble forecasts (multiple initialization times). The results for the EDM are shown, along with the wind speed from the ECMWF ensemble."
 
 # Plot the evolution of the spread with the number of initialization time
 function calc_avg_spread_accu(curdf)
@@ -385,15 +398,20 @@ function calc_avg_spread_accu(curdf)
         push!(fcstart_stats, stats)
     end
     accu = vcat(fcstart_stats...; cols=:union)
-    outdf = combine(groupby(accu, [:n_forecasts]), :H10_std => mean => :H10_std_avg)
-    print(outdf)
+    outdf = combine(groupby(accu, [:n_forecasts]), 
+        :H10_std => mean => :H10_std_avg,
+        :H10_mean => mean => :H10_mean_avg  
+    )
     sort(outdf, :n_forecasts)
 end
 
 function calc_avg_spread(df)
     outdf = @chain df begin
         combine(groupby(_, [:time, :receptorName, :fcstart]), :H10 => mean, :H10 => std)
-        combine(groupby(_, [:fcstart]), :H10_std => mean => :H10_std_avg)
+        combine(groupby(_, [:fcstart]), 
+            :H10_std => mean => :H10_std_avg,
+            :H10_mean => mean => :H10_mean_avg    
+        )
     end
     outdf[!, :fc_label] = ["-$(Dates.Hour(maximum(outdf.fcstart) - x))" for x in outdf.fcstart]
     sort(outdf, :fcstart)
@@ -404,21 +422,31 @@ gs_df = @rsubset df :simtype == "gaussian" && :isensemble == true && :receptorNa
 al_df = @rsubset df :receptorName in filtered_sensors && :isensemble == true
 
 fp_df_avg = calc_avg_spread(fp_df)
+fp_df_avg[!, "H10_varcoeff"] = fp_df_avg.H10_std_avg ./ mean(fp_df_avg.H10_mean_avg)
 gs_df_avg = calc_avg_spread(gs_df)
+gs_df_avg[!, "H10_varcoeff"] = gs_df_avg.H10_std_avg ./ mean(gs_df_avg.H10_mean_avg)
 al_df_avg = calc_avg_spread(al_df)
+al_df_avg[!, "H10_varcoeff"] = al_df_avg.H10_std_avg ./ mean(al_df_avg.H10_mean_avg)
 
 fp_df_avg_acc = calc_avg_spread_accu(fp_df)
+fp_df_avg_acc[!, "H10_varcoeff"] = fp_df_avg_acc.H10_std_avg ./ mean(fp_df_avg_acc.H10_mean_avg)
 gs_df_avg_acc = calc_avg_spread_accu(gs_df)
+gs_df_avg_acc[!, "H10_varcoeff"] = gs_df_avg_acc.H10_std_avg ./ mean(gs_df_avg_acc.H10_mean_avg)
 al_df_avg_acc = calc_avg_spread_accu(al_df)
+al_df_avg_acc[!, "H10_varcoeff"] = al_df_avg_acc.H10_std_avg ./ mean(al_df_avg_acc.H10_mean_avg)
 
 # In reality, the wind data have been linearly interpolated along the time dimension. For the sake of simplicity, we consider the left bound of the time window (which is the closest the interpolated point for the considered time steps)
 meteo_ens_stats = combine(groupby(meteo_df, [:time, :fc_label, :leadtime1]),
     :speed => mean => :speed_mean, 
     :speed => std => :speed_std,
 )
-meteo_avg_ens = combine(groupby(meteo_ens_stats, [:fc_label, :leadtime1]), :speed_std => mean => :speed_std_avg)
+meteo_avg_ens = combine(groupby(meteo_ens_stats, [:fc_label, :leadtime1]), 
+    :speed_std => mean => :speed_std_avg,
+    :speed_mean => mean => :speed_mean_avg,
+)
 
-f_spread_evol = Figure(; 
+f_spread_evol = Figure(;
+    size=(600,500)
 )
 
 COLORS = Makie.wong_colors()
@@ -427,42 +455,47 @@ npoints = length(fp_df_avg.fc_label)
 ax = Axis(f_spread_evol[1,1],
     # title = "Evolution of the spread average with the forecast start time for meteo.",
     # ylabel = L"\sigma",
-    ylabel = "average spread",
+    ylabel = "coefficient of variation",
     xlabel = "forecast lead time",
     # xlabel = "forecast initialization",
     xticklabelrotation = deg2rad(10),
     # xticks = (1:npoints, meteo_avg_ens.fc_label),
-    xticks = (1:npoints, ["$lt hours" for lt in meteo_avg_ens.leadtime1]),
+    xticks = (1:npoints, reverse(["$lt hours" for lt in meteo_avg_ens.leadtime1])),
 )
 
-scatterlines!(ax, reverse(1:npoints), reverse(fp_df_avg.H10_std_avg |> ustrip), label="flexpart", color=COLORS[1])
-scatterlines!(ax, reverse(1:npoints), fp_df_avg_acc.H10_std_avg |> ustrip, label="flexpart", color=COLORS[1], linestyle=:dash)
+scatterlines!(ax, reverse(1:npoints), fp_df_avg.H10_varcoeff, label="flexpart", color=COLORS[1])
+scatterlines!(ax, 1:npoints, fp_df_avg_acc.H10_varcoeff, label="flexpart", color=COLORS[1], linestyle=:dash)
 
-scatterlines!(ax, reverse(1:npoints), reverse(gs_df_avg.H10_std_avg |> ustrip), label="gaussian", color=COLORS[2])
-scatterlines!(ax, reverse(1:npoints), gs_df_avg_acc.H10_std_avg |> ustrip, label="gaussian", color=COLORS[2], linestyle=:dash)
+scatterlines!(ax, reverse(1:npoints), gs_df_avg.H10_varcoeff, label="gaussian", color=COLORS[2])
+scatterlines!(ax, 1:npoints, gs_df_avg_acc.H10_varcoeff, label="gaussian", color=COLORS[2], linestyle=:dash)
 
-scatterlines!(ax, reverse(1:npoints), reverse(al_df_avg.H10_std_avg |> ustrip), label="all", color=COLORS[3])
-scatterlines!(ax, reverse(1:npoints), al_df_avg_acc.H10_std_avg |> ustrip, label="all", color=COLORS[3], linestyle=:dash)
+scatterlines!(ax, reverse(1:npoints), al_df_avg.H10_varcoeff, label="both models", color=COLORS[3])
+scatterlines!(ax, 1:npoints, al_df_avg_acc.H10_varcoeff, label="both models", color=COLORS[3], linestyle=:dash)
 
-scatterlines!(ax, reverse(1:npoints), reverse(meteo_avg_ens.speed_std_avg), label="wind speed", color=COLORS[4])
+scatterlines!(ax, reverse(1:npoints), meteo_avg_ens.speed_std_avg ./ mean(meteo_avg_ens.speed_mean_avg), label="wind speed", color=COLORS[4])
 
-axislegend(ax, merge=true)
+axislegend(ax, merge=true, position=:rb)
 
 
-Makie.ylims!(ax, (0, 0.8))
-# save("figures/fig-spread.png", f_spread_evol)
+Makie.ylims!(ax, (0, 0.4))
+save("papers/figures/fig-spread.png", f_spread_evol)
 
 f_spread_evol
 ```
 
-To assess how forecast initialization times affect ensemble uncertainty, we computed the time- and station-averaged ensemble spread (@fig-spread). The results demonstrate a systematic increase in spread with each additional forecast initialization, culminating in a 42% enhancement for the full ensemble compared to using only the most recent forecast. Interestingly, individual model ensembles (FLEXPART or Gaussian plume alone) sometimes exhibit greater spread than the combined ensemble. This occurs because FLEXPART frequently produces tighter concentration distributions (lower spread) while maintaining similar ensemble means to the Gaussian plume model, thereby reducing the overall variability in the full ensemble.
+To evaluate the influence of forecast lead time on ensemble uncertainty, we calculated the time- and station-averaged coefficient of variation (the ratio of ensemble standard deviation to the mean), presented in @fig-spread. The results indicate a systematic increase in Ensemble Dispersion Model (EDM) uncertainty with longer lead times, a trend that generally correlates with the rising uncertainty in the ECMWF wind speed ensemble. However, a misalignment between EDM and wind speed spread is observed at specific lead times (especially 36h and 48h), likely attributable to nonlinearities introduced by the integration process required to convert Se-75 concentration fields to gamma dose rates. Furthermore, the analysis reveals that utilizing accumulated ensembles, as opposed to individual forecast initializations ensemble, has a minimal impact on the overall spread magnitude. The increase in coefficient of variation culminates in a 41% enhancement for the full ensemble (green line on @fig-spread) compared to using only the most recent forecast, while the highest uncertainty amplification reaches 152% when comparing the longer lead time of the full ensemble to the lowest lead time of FLEXPART.
 
 ```{julia}
 #| echo: false
-spread_increase = (allstats_avg.spread_avg[end] / allstats_avg.spread_avg[1] - 1) * 100
+spread_increase = (al_df_avg.H10_varcoeff[1] / al_df_avg.H10_varcoeff[end] - 1) * 100
 sspread_increase = @sprintf "%d" spread_increase
 # md"For the full ensemble, the spread is a increased by $(sspread_increase)%"
-sspread_increase == "42" || error("The percentage must be updated")
+sspread_increase == "41" || error("The percentage must be updated")
+
+spread_increase2 = (al_df_avg_acc.H10_varcoeff[end] / fp_df_avg.H10_varcoeff[end] - 1) * 100
+sspread_increase2 = @sprintf "%d" spread_increase2
+sspread_increase2 == "152" || error("The percentage must be updated")
+
 ```
 
 ```{julia}
@@ -533,9 +566,9 @@ f
 ```
 
 # Conclusion
-This study examined the influence of multi-model and multi-forecast initializations on ensemble spread in short-range dispersion modelling. Results indicate that increasing the number of forecast initializations generally enhances ensemble spread, whereas the multi-model approach can reduce it—particularly when the participating models share similar ensemble means.
+This study investigated strategies for enhancing ensemble spread in short-range atmospheric dispersion modelling through multi-model integration and the incorporation of multiple forecast initializations. Our findings demonstrate that both approaches effectively increase ensemble dispersion.
 
-In all cases, the ensembles analysed appeared under-dispersive. Further investigation could assess whether adding more forecast initialization members would lead to a greater spread. Ensemble skill was addressed only briefly and qualitatively in this work, as the limited dataset (24 cases) renders more robust quantitative assessments (e.g., rank histograms, bias, root-mean-square error) statistically unreliable. A more comprehensive evaluation of how multi-modeling and additional forecast initializations affect ensemble skill would require a substantially larger set of observations.
+Despite these enhancements, the ensembles remained under-dispersive, suggesting that further expansion of the ensemble—potentially through additional forecast initializations—may be necessary. Future work should determine whether spread continues to increase with additional members or eventually reaches an asymptotic limit. While this study provided brief qualitative insights into ensemble skill, the limited observational dataset (n=24) precluded robust quantitative evaluation using standard metrics like rank histograms or RMSE. A definitive assessment of how these methodologies impact predictive skill will require application to a more extensive set of well-characterized release events.
 
 # References
 

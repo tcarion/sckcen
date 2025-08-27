@@ -5,7 +5,8 @@ using Dates
 using GRIBDatasets
 using Plots
 using JLD2
-
+using DataFrames
+using DataFramesMeta
 
 include(srcdir("parameters.jl"))
 include(srcdir("gributils.jl"))
@@ -18,8 +19,9 @@ relstart = DateTime(RELSTART)
 inputdir = "/home/tricarion/Documents/sckcen/data/extractions/OPER_20190515/output"
 
 times = RELEASE_TIMES
+# meteo_df = DataFrame(load(datadir("meteo_ensemble.csv")))
 
-@time meteo_ecmwf = extract_meteo_ecmwf(inputdir, RELEASE_TIMES)
+@time meteo_ecmwf = extract_meteo_ecmwf(inputdir, RELEASE_TIMES .- Dates.Hour(2))
 
 winds = process_wind.(meteo_ecmwf)
 
@@ -47,7 +49,7 @@ puff = GaussianPuff(
 #     RELHEIGHT
 # )
 
-save(concentrationfile(simname), Dict(GAUSSIAN_SAVENAME => conc_da))
+# save(concentrationfile(simname), Dict(GAUSSIAN_SAVENAME => conc_da))
 
 # Xs = dims(concentration, X) |> collect
 # Ys = dims(concentration, Y) |> collect

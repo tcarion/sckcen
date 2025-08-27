@@ -25,12 +25,13 @@ dose_rates_da_by_fcstart = map(fcstarts) do fcstart
     puff = puffs[fcstart]
     conc = puff[CONC_LAYERNAME]
     @info "Compute fcstart: $fcstart"
-    dose_for_each_member = map(ddims(conc, :member)) do imember
+    memberdim = ddims(conc, :member)
+    dose_for_each_member = map(memberdim) do imember
         @info "Computing membmer $imember"
         @time compute_dose_rates(conc[member = At(imember)], sensor_numbers, sensors_dose_rates, nuclide_data)
     end
 
-    cat(dose_for_each_member...; dims = ddims(conc, :member))
+    cat(dose_for_each_member...; dims = memberdim)
     # time:  7.469 s (45033782 allocations: 6.49 GiB)
 end
 

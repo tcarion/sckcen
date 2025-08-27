@@ -67,7 +67,7 @@ end
 
 valid_time(input::InputArrays) = first(input.ds["valid_time"][:])
 time_bounds(bound::BoundingInputs) = (valid_time(bound.t1), valid_time(bound.t2))
-lead_time(filepath::String) = parse(Int, split(basename(filepath), ".")[3])
+lead_time(filepath::String) = parse(Int, match(r"\D{2,3}\d{6}(?:.{3})?\.?(\d{2,3})", basename(filepath)).captures[1])
 lead_time(inp::InputArrays) = lead_time(inp.ds.index.grib_path)
 lead_times(bounds::BoundingInputs) = (lead_time(bounds.t1), lead_time(bounds.t2))
 

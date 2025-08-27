@@ -49,7 +49,8 @@ for fcstart in val(fcstartdim)
     @info "Computing fcstart: $fcstart"
     for imember in members
         @info "Computing member $imember"
-        @time meteo_ecmwf = extract_meteo_ecmwf(inputdir, RELEASE_TIMES, member = imember)
+        # We substract 2 hours to convert to UTC
+        @time meteo_ecmwf = extract_meteo_ecmwf(inputdir, RELEASE_TIMES .- Dates.Hour(2), member = imember)
         meteo_stack[:u][member=At(imember), fcstart=At(fcstart)] = [m.u for m in meteo_ecmwf] 
         meteo_stack[:v][member=At(imember), fcstart=At(fcstart)] = [m.v for m in meteo_ecmwf] 
         meteo_stack[:leadtime1][fcstart=At(fcstart)] = meteo_ecmwf[1].lt1

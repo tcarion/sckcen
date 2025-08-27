@@ -7,7 +7,8 @@ using GRIBDatasets
 using Plots
 using JLD2
 using DimensionalData: dims as ddims
-
+using DataFrames
+using DataFramesMeta
 
 include(srcdir("parameters.jl"))
 include(srcdir("gributils.jl"))
@@ -26,6 +27,8 @@ fcstartmap = Dict(
 relstart = DateTime(RELSTART)
 
 times = RELEASE_TIMES
+meteo_df = DataFrame(load(datadir("meteo_ensemble.csv")))
+
 inputdirpath(date) = joinpath(datadir(), "extractions","ENFO", date, "PF")
 
 allpuffs = Dict()
@@ -36,8 +39,10 @@ for (fcstart, v) in fcstartmap
     @info "Computing fcstart: $fcstart"
     conc_for_each_member = map(members) do imember
         @info "Computing member $imember"
-        @time meteo_ecmwf = extract_meteo_ecmwf(inputdir, RELEASE_TIMES, member = imember)
-        winds = process_wind.(meteo_ecmwf)
+        # @time meteo_ecmwf = extract_meteo_ecmwf(inputdir, RELEASE_TIMES, member = imember)
+        wind_data = @rsubset meteo_df :fcstart == string(fcstart) && :member == imember
+
+        winds = process_wind.(wind_data.u, wind_data.v)
         grid = CenteredGrid()
         
         puff = GaussianPuff(
