@@ -46,7 +46,7 @@ The folders will be briefly described here, but additional information can be fo
 - `src` defines the functions, the data structures and the constants used in the `scripts` and the `notebooks`. It also contains the Sckcen.jl package used to calculate the gamma dose rates, among other things.
 - `scripts` use the code in `src` to prepare, run and postprocess the simulations.
 - `data` contains mostly the input weather data and the simulation results.
-- `plots` is where the some of the plots generated in `scripts` are saved.
+- `papers` contains the files related to presentation or papers.
 - `notebooks` is where the results are postprocessed and somewhat interpreted using the code from `src`.
 
 ## Caveat
